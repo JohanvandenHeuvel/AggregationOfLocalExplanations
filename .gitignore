@@ -252,6 +252,19 @@ Thumbs.db
 # profiling data
 .prof
 
+/experiment1/data
+/experiment2/data
+/experiment3/data
+/results
+*.vscode/
 
 # End of https://www.toptal.com/developers/gitignore/api/python,pycharm
+
+/experiment2/ensemble_score_imagenet_resnet.ipynb
+/experiment2/ensemble_score_imagenet_vgg19.ipynb
+/scripts/data
+*.idea/
+cifar10.pt
+data/
+mnist_net.pt
 

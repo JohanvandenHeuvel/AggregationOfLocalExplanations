@@ -1,6 +1,6 @@
 import torch
 
-from plot import plot_batch
+from scripts.plot import plot_batch
 
 
 def test(net, testloader):
