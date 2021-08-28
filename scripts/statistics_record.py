@@ -6,6 +6,7 @@ import torch
 
 EXPERIMENTS_PATH = "data"
 
+
 class AttrbutionsRecord:
     def __init__(self, title, dataset, package_id, methods, model):
         self.title = title
@@ -24,7 +25,7 @@ class AttrbutionsRecord:
         self.ensemble_attributions = []
 
         self.measure_insert = None
-        self.measure_delete= None
+        self.measure_delete = None
         self.measure_irof = None
 
         self.attributions_stat_irof = []
@@ -44,7 +45,11 @@ class AttrbutionsRecord:
 
         self.statistics = None
 
-        if path.exists(AttrbutionsRecord.get_path(self.title, self.experiment_name, self.package_id)):
+        if path.exists(
+            AttrbutionsRecord.get_path(
+                self.title, self.experiment_name, self.package_id
+            )
+        ):
             raise Exception("Experiment already exists")
 
     def get_ensemble_double_rbm(self, image_nr):
@@ -54,7 +59,7 @@ class AttrbutionsRecord:
             ensembles.append(self.ensembles[i])
             attributions.append(attr)
             if self.ensemble_tasks[i]["technique"] == "rbm":
-                attributions.append(1-attr)
+                attributions.append(1 - attr)
                 ensembles.append(self.ensembles[i] + " flipped")
 
         return_ = [(attributions[i], ensembles[i]) for i in range(len(ensembles))]
@@ -87,8 +92,14 @@ class AttrbutionsRecord:
     def record_ensemble_tasks(self, ensemble_tasks):
         self.ensemble_tasks = ensemble_tasks
 
-    def create_statistics_table(self, measure_individual_methods, measure_ensembles, measure_insert, measure_delete,
-                                measure_irof):
+    def create_statistics_table(
+        self,
+        measure_individual_methods,
+        measure_ensembles,
+        measure_insert,
+        measure_delete,
+        measure_irof,
+    ):
         self.measure_insert = measure_insert
         self.measure_delete = measure_delete
         self.measure_irof = measure_irof
@@ -119,38 +130,63 @@ class AttrbutionsRecord:
         return f"{AttrbutionsRecord.get_directory(title, experiment_name)}/{package_id}.pkl"
 
     def save(self):
-        Path(AttrbutionsRecord.get_directory(self.title, self.experiment_name)).mkdir(parents=True, exist_ok=True)
+        Path(AttrbutionsRecord.get_directory(self.title, self.experiment_name)).mkdir(
+            parents=True, exist_ok=True
+        )
 
         for i in range(len(self.images)):
             self.images[i] = self.images[i].cpu().numpy()
             self.raw_images[i] = self.raw_images[i].cpu().numpy()
 
-        with open(AttrbutionsRecord.get_path(self.title, self.experiment_name,
-                                             self.package_id), 'wb') as output:
+        with open(
+            AttrbutionsRecord.get_path(
+                self.title, self.experiment_name, self.package_id
+            ),
+            "wb",
+        ) as output:
             pickle.dump(self, output, pickle.HIGHEST_PROTOCOL)
 
     def start_ensemble(self, ensemble_experiment_name):
-        assert(self.experiment_name == "individual_attribution")
+        assert self.experiment_name == "individual_attribution"
         self.experiment_name = ensemble_experiment_name
 
-    def record_attributions_statistics(self, method, insert_statistic, delete_statistic, irof_statistic):
-        self.statistics[method].append([insert_statistic[0], delete_statistic[0], irof_statistic[0]])
+    def record_attributions_statistics(
+        self, method, insert_statistic, delete_statistic, irof_statistic
+    ):
+        self.statistics[method].append(
+            [insert_statistic[0], delete_statistic[0], irof_statistic[0]]
+        )
         self.attributions_stat_insert.append(insert_statistic)
         self.attributions_stat_delete.append(delete_statistic)
         self.attributions_stat_irof.append(irof_statistic)
 
-    def record_ensemble_statistics(self, ensemble, insert_statistic, delete_statistic, irof_statistic,
-                                   insert_flip_statistic, delete_flip_statistic, irof_flip_statistic, prefer_flip):
+    def record_ensemble_statistics(
+        self,
+        ensemble,
+        insert_statistic,
+        delete_statistic,
+        irof_statistic,
+        insert_flip_statistic,
+        delete_flip_statistic,
+        irof_flip_statistic,
+        prefer_flip,
+    ):
         stats = []
 
         if prefer_flip:
-            if self.measure_insert: stats.append(insert_flip_statistic[0])
-            if self.measure_delete: stats.append(delete_flip_statistic[0])
-            if self.measure_irof: stats.append(irof_flip_statistic[0])
+            if self.measure_insert:
+                stats.append(insert_flip_statistic[0])
+            if self.measure_delete:
+                stats.append(delete_flip_statistic[0])
+            if self.measure_irof:
+                stats.append(irof_flip_statistic[0])
         else:
-            if self.measure_insert: stats.append(insert_statistic[0])
-            if self.measure_delete: stats.append(delete_statistic[0])
-            if self.measure_irof: stats.append(irof_statistic[0])
+            if self.measure_insert:
+                stats.append(insert_statistic[0])
+            if self.measure_delete:
+                stats.append(delete_statistic[0])
+            if self.measure_irof:
+                stats.append(irof_statistic[0])
         self.statistics[ensemble].append(stats)
 
         self.ensemble_stat_insert.append(insert_statistic)
@@ -170,12 +206,18 @@ class AttrbutionsRecord:
         ensembles_titles = []
         flips = []
 
-        if (len(self.attributions_stat_irof) > 0 or len(self.attributions_stat_insert) > 0 or
-                len(self.attributions_stat_delete) > 0):
+        if (
+            len(self.attributions_stat_irof) > 0
+            or len(self.attributions_stat_insert) > 0
+            or len(self.attributions_stat_delete) > 0
+        ):
             attributions_titles = self.methods
 
-        if (len(self.ensemble_stat_irof) > 0 or len(self.ensemble_stat_insert) > 0 or
-                len(self.ensemble_stat_delete) > 0):
+        if (
+            len(self.ensemble_stat_irof) > 0
+            or len(self.ensemble_stat_insert) > 0
+            or len(self.ensemble_stat_delete) > 0
+        ):
             ensembles_titles = self.ensembles
 
         if len(self.rbm_flip_statistics) > 0:
@@ -190,7 +232,7 @@ class AttrbutionsRecord:
     @classmethod
     def load(cls, title, experiment_name, filename):
         directory = AttrbutionsRecord.get_directory(title, experiment_name)
-        with open(f"{directory}/{filename}", 'rb') as input:
+        with open(f"{directory}/{filename}", "rb") as input:
             data = pickle.load(input)
 
         for i in range(len(data.images)):
@@ -198,4 +240,3 @@ class AttrbutionsRecord:
             data.raw_images[i] = torch.DoubleTensor(data.raw_images[i])
 
         return data
-

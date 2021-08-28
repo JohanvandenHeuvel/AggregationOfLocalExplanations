@@ -1,10 +1,22 @@
 import numpy as np
 
 
+def normalize(method, **kwargs):
+
+    if method == "absolute":
+        return normalize_abs(**kwargs)
+
+    if method == "duplex_absolute":
+        return duplex_normalize_abs(**kwargs)
+
+    if method == "sum":
+        return normalize_sum1(**kwargs)
+
+
 def normalize_abs(arr):
     value = arr - np.min(arr)
 
-    distance = (np.max(arr) - np.min(arr))
+    distance = np.max(arr) - np.min(arr)
     if distance > 0:
         value = value / distance
 
@@ -15,10 +27,9 @@ def duplex_normalize_abs(arr1, arr2):
     value1 = arr1 - np.min(arr1)
     value2 = arr2 - np.min(arr2)
 
-    distance1 = (np.max(arr1) - np.min(arr1))
-    distance2 = (np.max(arr1) - np.min(arr1))
+    distance1 = np.max(arr1) - np.min(arr1)
+    distance2 = np.max(arr1) - np.min(arr1)
     distance = max(distance1, distance2)
-
 
     if distance > 0:
         value1 = value1 / distance
