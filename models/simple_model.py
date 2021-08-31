@@ -5,7 +5,7 @@ import torchvision
 from torchvision import transforms, models
 from torchvision.models import resnet18
 from models.train import train
-from scripts.load_data import get_data
+# from scripts.load_data import get_data
 from models.resnet import resnet34, resnet18
 
 
@@ -52,7 +52,7 @@ class MNIST_Net(nn.Module):
         try:
             if path is None:
                 path = self.model_name
-            self.load_state_dict(torch.load(path))
+            self.load_state_dict(torch.load(path + '.pt'))
             print("models loaded")
         except:
             transform = transforms.Compose(
@@ -103,7 +103,7 @@ class Cifar_Net(nn.Module):
         try:
             if path is None:
                 path = self.model_name
-            self.load_state_dict(torch.load(path))
+            self.load_state_dict(torch.load(path + '.pt'))
             print("models loaded")
         except:
             transform = transforms.Compose(
@@ -121,7 +121,7 @@ class Cifar_Net(nn.Module):
 
 
 
-if __name__ == "__main__":
-    net = Cifar_Net()
-    trainloader, testloader, classes = get_data()
-    train(net, trainloader)
+# if __name__ == "__main__":
+#     net = Cifar_Net()
+#     trainloader, testloader, classes = get_data()
+#     train(net, trainloader)
