@@ -2,12 +2,14 @@ from captum.attr import *
 import torch
 
 
-def generate_attributions(image_batch, label_batch, methods, device="cpu"):
+def generate_attributions(image_batch, label_batch, model, methods, device="cpu"):
 
     size = [len(methods)] + [image_batch.shape[0], image_batch.shape[2], image_batch.shape[3]]
     a = torch.empty(size=size).to(device)
     for i, m in enumerate(methods):
-        attr = m(image_batch, label_batch)
+
+        method = attribution_method(m, model)
+        attr = method(image_batch, label_batch)
         # sum over the color channels
         attr = torch.mean(attr, dim=1)
         a[i] = attr
@@ -46,6 +48,7 @@ def attribute_image_features(model, name, input, label, **kwargs):
 
 
 def deeplift(model, **kwargs):
+
     def f(x, y):
         return DeepLift(model).attribute(x, target=y, **kwargs)
 

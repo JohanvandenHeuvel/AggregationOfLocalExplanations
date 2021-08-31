@@ -17,6 +17,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+torch.cuda.empty_cache()
 
 ###########################
 #  for writing to disk    #
@@ -31,10 +32,10 @@ os.makedirs(folder_path)
 #  experiment conditions  #
 ###########################
 params = {
-    "model": "Resnet18_cifar10",
-    "dataset": "cifar10",
-    "batch_size": 1,
-    "attribution_methods": ["deeplift", "smoothgrad", "saliency"]
+    "model": "Resnet18",
+    "dataset": "small_imagenet",
+    "batch_size": 8,
+    "attribution_methods": ["deeplift", "saliency"]
     + ["noise_uniform"] * 0,
     "ensemble_methods": ["mean", "variance", "rbm"],
     "attribution_processing": "filtering",
@@ -49,10 +50,10 @@ def main():
     # classification model
     model = get_model(params["model"], device=device)
 
-    # methods for explaining
-    attribution_methods = [
-        attribution_method(method, model) for method in params["attribution_methods"]
-    ]
+    # # methods for explaining
+    # attribution_methods = [
+    #     attribution_method(method, model) for method in params["attribution_methods"]
+    # ]
 
     # dataset and which images to explain the classification for
     dataset = datasets.get_dataset(params["dataset"])
@@ -66,9 +67,12 @@ def main():
         image_batch = image_batch.to(device)
         label_batch = label_batch.to(device)
 
+        # TODO remove (small imagenet does not have it's own labels)
+        if params["dataset"] == "small_imagenet":
+            label_batch = predict_label(model, image_batch).squeeze()
+
         # for what label the image should be explained for
-        predicted_labels = predict_label(model, image_batch)
-        predicted_labels = predicted_labels.squeeze()
+        predicted_labels = predict_label(model, image_batch).squeeze()
 
         # only use images that the network predicts correctly
         mask = torch.eq(label_batch, predicted_labels)
@@ -76,7 +80,7 @@ def main():
 
         # generate explanations
         attributions = generate_attributions(
-            image_batch[indices], label_batch[indices], attribution_methods, device,
+            image_batch[indices], label_batch[indices], model, params["attribution_methods"], device,
         )
 
         ###########################
@@ -107,7 +111,7 @@ def main():
         ###########################
         #      plot examples      #
         ###########################
-        for idx in range(1):
+        for idx in range(8):
             # idx = 0  # first image of the batch
             original_img = (
                 torch.mean(image_batch[indices], dim=1)[idx].cpu().detach().numpy()

@@ -13,8 +13,10 @@ def get_dataset(name):
     if name == "cifar10":
         return Cifar10()
 
-    # if name == "small_imagenet":
-    #     return SmallImagenet()
+    if name == "small_imagenet":
+        return SmallImagenet()
+
+    raise ValueError
 
 
 def image_3D_to_4D(image):
@@ -72,32 +74,34 @@ def Cifar10():
     return dataset
 
 
-# class SmallImagenet(Dataset, ABC):
-#     def __init__(self):
-#         super().__init__()
+def SmallImagenet():
+    # https://shap.readthedocs.io/en/latest/example_notebooks/image_examples/image_classification/Explain%20an%20Intermediate%20Layer%20of%20VGG16%20on%20ImageNet%20%28PyTorch%29.html
+    mean = [0.485, 0.456, 0.406]
+    std = [0.229, 0.224, 0.225]
+
+    def normalize(image):
+        if image.max() > 1:
+            image /= 255
+        image = (image - mean) / std
+        # in addition, roll the axis so that they suit pytorch
+        return torch.tensor(image.swapaxes(-1, 1).swapaxes(2, 3)).float()
+
+    X, y = shap.datasets.imagenet50()
+    X = normalize(X)
+    y = torch.Tensor(y).unsqueeze(1) # labels are actually not usable
+
+    dataset = torch.utils.data.TensorDataset(X, y)
+
+    return dataset
+
+
+# def normalize(self, image):
+#     if image.max() > 1:
+#         image /= 255
+#     image = (image - self.mean) / self.std
+#     # in addition, roll the axis so that they suit pytorch
+#     return torch.tensor(image.swapaxes(-1, 1).swapaxes(2, 3)).float()
 #
-#         # TODO get in same form as cifar10
-#
-#         self.mean = [0.485, 0.456, 0.406]
-#         self.std = [0.229, 0.224, 0.225]
-#
-#         self.dataset, _ = shap.datasets.imagenet50()
-#         self.dataset /= 255
-#
-#         # self.transform = transforms.Compose(
-#         #     [
-#         #         transforms.ToTensor(),
-#         #         transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
-#         #     ]
-#         # )
-#
-#     def normalize(self, image):
-#         if image.max() > 1:
-#             image /= 255
-#         image = (image - self.mean) / self.std
-#         # in addition, roll the axis so that they suit pytorch
-#         return torch.tensor(image.swapaxes(-1, 1).swapaxes(2, 3)).float()
-#
-#     def get_image(self, idx):
-#         X = self.dataset[idx]
-#         return self.normalize(X).to(self.device)
+# def get_image(self, idx):
+#     X = self.dataset[idx]
+#     return self.normalize(X).to(self.device)
