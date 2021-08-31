@@ -264,7 +264,6 @@ Thumbs.db
 /experiment2/ensemble_score_imagenet_vgg19.ipynb
 /scripts/data
 *.idea/
-cifar10.pt
+*.pt
 data/
-mnist_net.pt
 
