@@ -30,14 +30,14 @@ class IrofDataset(PixelManipulationBase):
         img_np = self._image.detach().cpu().numpy().transpose(1, 2, 0)
         segments = slic(img_np, self._irof_segments, self._irof_segments).reshape(-1)
         nr_segments = np.max(segments) + 1
-        segments = torch.LongTensor(segments).to(self._device)
+        segments = torch.LongTensor(segments).to(device=self._device)
 
         # Attribution score of each segment = Mean attribution
         attr = self._attribution.reshape(-1)
         seg_mean = [
             torch.mean(attr[segments == seg]).item() for seg in range(nr_segments)
         ]
-        seg_mean = torch.FloatTensor(seg_mean).to(self._device)
+        seg_mean = torch.FloatTensor(seg_mean).to(device=self._device)
 
         # Sort segments descending by mean attribution
         seg_rank = torch.argsort(-seg_mean)
@@ -53,7 +53,7 @@ class IrofDataset(PixelManipulationBase):
 
         # Add placeholder for original image
         IrofDataset._add_to_hierarhical_list(
-            self._pixel_batches, self._batch_size, torch.Tensor([0]).to(self._device)
+            self._pixel_batches, self._batch_size, torch.Tensor([0]).to(device=self._device)
         )
 
         # Save the statistics for generate_temp_baseline
@@ -75,7 +75,7 @@ class IrofDataset(PixelManipulationBase):
         # Create a matrix of indices of size [batch_size, all_pixels]
         template_indices = all_pixels.view(1, -1).repeat(batch_size, 1)
         # Shift each batch by total amount of pixels of previous image
-        batch_indices = PixelManipulationBase._index_shift(
+        batch_indices = self._index_shift(
             template_indices.long(), self.width * self.height
         )
 

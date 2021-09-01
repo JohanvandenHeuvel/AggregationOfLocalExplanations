@@ -66,12 +66,11 @@ class PixelManipulationBase(Dataset):
     def _get_batch_size(self, index):
         return len(self._pixel_batches[index])
 
-    @staticmethod
-    def _index_shift(matrix, add_per_row):
+    def _index_shift(self, matrix, add_per_row):
         # Adds (i-1) * add_per_row to every cell in row i. Nothing for row 1
-        factor = add_per_row * torch.diag(torch.arange(0, len(matrix)))
-        new_matrix = factor @ torch.ones_like(matrix) + matrix
-        return new_matrix
+        factor = add_per_row * torch.diag(torch.arange(0, len(matrix), device=self._device)).float()
+        new_matrix = factor @ torch.ones_like(matrix, device=self._device).float() + matrix
+        return new_matrix.long()
 
     @abc.abstractmethod
     def _gen_indices(self, index):

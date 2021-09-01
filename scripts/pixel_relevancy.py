@@ -27,7 +27,7 @@ class PixelRelevancyDataset(PixelManipulationBase):
             :max_nr_pixels
         ]
         # Add placeholder for original image
-        placeholder = torch.LongTensor(self._package_size * [0]).to(self._device)
+        placeholder = torch.LongTensor(self._package_size * [0]).to(device=self._device)
         pixel_relevancy_desc = torch.cat((pixel_relevancy_desc, placeholder))
         # Form groups of size package_size
         pixel_relevancy_groups = pixel_relevancy_desc.reshape(-1, self._package_size)
@@ -42,7 +42,7 @@ class PixelRelevancyDataset(PixelManipulationBase):
         # Create a matrix of indices of size [batch_size, package_size * batch_size]
         template_indices = self._pixel_batches[index].view(1, -1).repeat(batch_size, 1)
         # Shift each batch by total amount of pixels of previous image
-        batch_indices = PixelManipulationBase._index_shift(
+        batch_indices = self._index_shift(
             template_indices.long(), self.width * self.height
         )
 

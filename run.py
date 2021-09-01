@@ -37,13 +37,13 @@ os.makedirs(folder_path)
 params = {
     "model": "mnist_model",
     "dataset": "mnist",
-    "batch_size": 10,
+    "batch_size": 70,
     "attribution_methods": ["deeplift", "saliency"] + ["noise_uniform"] * 0,
     "ensemble_methods": ["mean", "variance", "rbm", "flipped_rbm"],
     "attribution_processing": "filtering",
     "normalization": "min_max",
     "scoring_methods": ["insert", "delete", "irof"],  # TODO: New params have been added
-    "scores_batch_size": 3,
+    "scores_batch_size": 200,
     "package_size": 2,
     "irof_segments": 60,
     "irof_sigma": 4,
@@ -99,8 +99,8 @@ def main():
         )
 
         # TODO: Integrate it nicely, e.g. attributions & ensembles need to be handed over
-        metric.compute_batch_score(image_batch, label_batch, attributions)
-        if i == 10:  # TODO: Integrate
+        metric.compute_batch_score(image_batch[indices], label_batch[indices], attributions)
+        if i == 100:  # TODO: Integrate
             create_statistics_table(scores)
             return
 
