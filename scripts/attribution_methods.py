@@ -35,6 +35,9 @@ def attribution_method(name, model, **kwargs):
     if name == "smoothgrad":
         return smoothgrad(model, **kwargs)
 
+    if name == "gray_image":
+        return gray_image(**kwargs)
+
     if name == "noise_normal":
         return noise_normal(**kwargs)
 
@@ -81,6 +84,11 @@ def smoothgrad(model, **kwargs):
     )
     return f
 
+def gray_image(**kwargs):
+    def f(x, y):
+        return torch.mean(x, dim=1).unsqueeze(1)
+
+    return f
 
 def noise_normal(**kwargs):
     def f(x, y):

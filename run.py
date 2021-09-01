@@ -1,17 +1,13 @@
 import torch
-
-from models.model import get_model
 import json
 from tqdm import tqdm
-
 import os
 import datetime
-
 import numpy as np
-
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from models.model import get_model
 from scripts.attribution_methods import attribution_method, generate_attributions
 from scripts.normalize import normalize
 import scripts.datasets as datasets
@@ -35,16 +31,17 @@ os.makedirs(folder_path)
 #  experiment conditions  #
 ###########################
 params = {
-    "model": "mnist_model",
-    "dataset": "mnist",
-    "batch_size": 70,
-    "attribution_methods": ["deeplift", "saliency"] + ["noise_uniform"] * 0,
-    "ensemble_methods": ["mean", "variance", "rbm", "flipped_rbm"],
+    "model": "Resnet18_cifar10",
+    "dataset": "cifar10",
+    "batch_size": 50,
+    "max_nr_batches": 5,
+    "attribution_methods": ["deeplift", "saliency", "saliency", "occlusion", "smoothgrad", "guidedbackprop", "gray_image"] + ["noise_uniform"] * 0,
+    "ensemble_methods": ["mean", "variance"], #, "rbm", "flipped_rbm"],
     "attribution_processing": "filtering",
     "normalization": "min_max",
-    "scoring_methods": ["insert", "delete", "irof"],  # TODO: New params have been added
-    "scores_batch_size": 200,
-    "package_size": 2,
+    "scoring_methods": ["insert", "delete", "irof"],
+    "scores_batch_size": 100,
+    "package_size": 1,
     "irof_segments": 60,
     "irof_sigma": 4,
 }
@@ -63,15 +60,16 @@ def main():
         dataset, batch_size=params["batch_size"], shuffle=False, num_workers=2
     )
 
+    # Preparation for score comoputation later
+    attr_titles = params["attribution_methods"] + params["ensemble_methods"]
     scores = dict(
         [
-            (score, dict([(m, []) for m in params["attribution_methods"]]))
+            (score, dict([(m, []) for m in attr_titles]))
             for score in params["scoring_methods"]
         ]
     )
     metric = ScoringMetric(model, scores, params)
 
-    # TODO remove splitting of the tuple, most functions can use the tuple as is
     for i, (image_batch, label_batch) in tqdm(enumerate(dataloader)):
 
         # put data on gpu if possible
@@ -97,14 +95,6 @@ def main():
             params["attribution_methods"],
             device,
         )
-
-        # TODO: Integrate it nicely, e.g. attributions & ensembles need to be handed over
-        metric.compute_batch_score(image_batch[indices], label_batch[indices], attributions)
-        if i == 100:  # TODO: Integrate
-            create_statistics_table(scores)
-            return
-
-    for i in range(10):
 
         ###########################
         #  explanation processing #
@@ -137,40 +127,51 @@ def main():
         )
 
         ###########################
+        #       statistics        #
+        ###########################
+
+        metric.compute_batch_score(image_batch[indices], label_batch[indices], attributions, ensemble_attributions)
+
+        # TODO: Uncommented, maybe put into a separate function
+        ###########################
         #      plot examples      #
         ###########################
-        for idx in range(params["batch_size"]):
-            # idx = 0  # first image of the batch
-            original_img = (
-                torch.mean(image_batch[indices], dim=1)[idx].cpu().detach().numpy()
-            )
-            images = [original_img]
+        # for idx in range(params["batch_size"]):
+        #     # idx = 0  # first image of the batch
+        #     original_img = (
+        #         torch.mean(image_batch[indices], dim=1)[idx].cpu().detach().numpy()
+        #     )
+        #     images = [original_img]
+        #
+        #     # TODO don't plot noise attributions
+        #     # one image for every attribution method
+        #     for j in range(len(params["attribution_methods"])):
+        #         attribution_img = attributions[j][idx].cpu().detach().numpy()
+        #         images.append(attribution_img)
+        #
+        #     # one image for every ensemble method
+        #     for j in range(len(params["ensemble_methods"])):
+        #         ensemble_img = ensemble_attributions[j][idx].cpu().detach().numpy()
+        #         images.append(ensemble_img)
+        #
+        #     my_plot(
+        #         images,
+        #         ["original"]
+        #         + params["attribution_methods"]
+        #         + params["ensemble_methods"]
+        #         + ["flipped_rbm"],
+        #         save=False,
+        #     )
 
-            # TODO don't plot noise attributions
-            # one image for every attribution method
-            for j in range(len(params["attribution_methods"])):
-                attribution_img = attributions[j][idx].cpu().detach().numpy()
-                images.append(attribution_img)
-
-            # one image for every ensemble method
-            for j in range(len(params["ensemble_methods"])):
-                ensemble_img = ensemble_attributions[j][idx].cpu().detach().numpy()
-                images.append(ensemble_img)
-
-            my_plot(
-                images,
-                ["original"]
-                + params["attribution_methods"]
-                + params["ensemble_methods"]
-                + ["flipped_rbm"],
-                save=False,
-            )
-
-        if i > 1:
-            break
+        if i+1 >= params["max_nr_batches"]:
+            write_scores_to_file(scores)
+            score_table = create_score_table(scores)
+            pd.options.display.width = 0
+            print(score_table)
+            return
 
 
-def create_statistics_table(scores):
+def create_score_table(scores):
     # For each method add mean and std column
     columns = [[method + " mean", method + " std"] for method in scores.keys()]
     columns = sum(columns, [])
@@ -178,8 +179,8 @@ def create_statistics_table(scores):
 
     # Create a row for each attribution method
     data = []
-    for method in scores[list(scores.keys())[0]].keys():
-        data.append([method])
+    method_titles = list(scores[list(scores.keys())[0]].keys()) + ["rbm_ideal"]
+    data = [[method] for method in method_titles]
 
     # Calculate for each combination of attribution and method
     # the mean and variance score
@@ -187,6 +188,14 @@ def create_statistics_table(scores):
         for j, method in enumerate(scores[statistic]):
             data[j].append(np.mean(scores[statistic][method]))
             data[j].append(np.std(scores[statistic][method]))
+
+        # Compoute rbm_ideal
+        # For every score pair of rbm and rbm_flipped, pick the better one.
+        function = np.min if statistic == "delete" else np.max
+        rbms = np.asarray([scores[statistic]["rbm"], scores[statistic]["flipped_rbm"]])
+        best_rbm_scores = function(rbms, axis=0)
+        data[-1].append(np.mean(best_rbm_scores))
+        data[-1].append(np.std(best_rbm_scores))
 
     df = pd.DataFrame(data, columns=columns)
     return df
@@ -226,6 +235,12 @@ def write_to_file(my_str):
     file_path = os.path.join(folder_path, file_name)
     with open(file_path, "w") as f:
         f.write(my_str)
+
+
+def write_scores_to_file(scores):
+    file_name = "scores.npy"
+    file_path = os.path.join(folder_path, file_name)
+    np.save(file_path, scores)
 
 
 if __name__ == "__main__":

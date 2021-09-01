@@ -14,14 +14,23 @@ class ScoringMetric:
         self._params = params
         self._scores = scores
 
-    def compute_batch_score(self, image_batch, label_batch, attributions):
+    def compute_batch_score(self, image_batch, label_batch, attributions, ensembles):
+        if len(self._scores.keys()) == 0:
+            return
+
+        attr_titles = list(next(iter(self._scores.values())).keys())
+        all_attributions = torch.cat((attributions, ensembles), 0)
+
         for i, (image, label) in enumerate(zip(image_batch, label_batch)):
             for scoring_method in self._params["scoring_methods"]:
-                for attr, title in zip(attributions[:, i], self._params["attribution_methods"]):
+                for attr, title in zip(all_attributions[:, i], attr_titles):
+                    if title == "noise_normal" or "noise_uniform" == title:
+                        continue
+
                     scoring_dataset = self._make_scoring_dataset(
                         scoring_method, image, attr
                     )
-                    score = self._calc_score(scoring_dataset, label)
+                    score, _ = self._calc_score(scoring_dataset, label)
                     self._scores[scoring_method][title].append(score)
 
     def _make_scoring_dataset(self, scoring_method, image, attr):
@@ -51,17 +60,18 @@ class ScoringMetric:
     def _calc_score(self, scoring_dataset, label):
 
         probs = []
-        for img_batch in scoring_dataset:
+        for j, img_batch in enumerate(scoring_dataset):
             probs += [calculate_probs(self._model, img_batch)[:, label]]
 
         probs = torch.cat(probs)
-        rel_probs = probs / probs[-1]
+        rel_probs = probs[:-1] / probs[-1]
 
         x = np.arange(0, len(rel_probs))
         y = rel_probs.detach().cpu().numpy()
+
         score = auc(x, y) / len(rel_probs)
 
-        return score
+        return score, y
 
 
 

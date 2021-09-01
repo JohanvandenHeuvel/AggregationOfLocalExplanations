@@ -1,5 +1,3 @@
-# TODO: Some parts of IrofDataset and PixelRelevancyDataset may be redundant, because they are optimized.
-# It maybe be possible to merge some parts, but I would focus on other things now
 import torch
 import numpy as np
 from skimage.segmentation import slic
