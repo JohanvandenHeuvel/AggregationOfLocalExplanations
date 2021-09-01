@@ -2,6 +2,7 @@
 # It maybe be possible to merge some parts, but I would focus on other things now
 import torch
 import numpy as np
+from skimage.segmentation import slic
 
 from scripts.pixel_manipulation import PixelManipulationBase
 

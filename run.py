@@ -17,7 +17,7 @@ from scripts.normalize import normalize
 import scripts.datasets as datasets
 from scripts.ensemble import generate_ensembles
 from models.predict import predict_label
-from scripts.scoring_measures import calc_scores
+from scripts.scoring_metric import ScoringMetric
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 torch.cuda.empty_cache()
@@ -69,6 +69,7 @@ def main():
             for score in params["scoring_methods"]
         ]
     )
+    metric = ScoringMetric(model, scores, params)
 
     # TODO remove splitting of the tuple, most functions can use the tuple as is
     for i, (image_batch, label_batch) in tqdm(enumerate(dataloader)):
@@ -98,15 +99,7 @@ def main():
         )
 
         # TODO: Integrate it nicely, e.g. attributions & ensembles need to be handed over
-        calc_scores(
-            model,
-            image_batch,
-            label_batch,
-            attributions,
-            scores,
-            params,
-        )
-
+        metric.compute_batch_score(image_batch, label_batch, attributions)
         if i == 10:  # TODO: Integrate
             create_statistics_table(scores)
             return
@@ -183,10 +176,13 @@ def create_statistics_table(scores):
     columns = sum(columns, [])
     columns = ["method"] + columns
 
+    # Create a row for each attribution method
     data = []
     for method in scores[list(scores.keys())[0]].keys():
         data.append([method])
 
+    # Calculate for each combination of attribution and method
+    # the mean and variance score
     for statistic in scores.keys():
         for j, method in enumerate(scores[statistic]):
             data[j].append(np.mean(scores[statistic][method]))

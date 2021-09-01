@@ -1,0 +1,70 @@
+import numpy as np
+import abc
+import torch
+from sklearn.metrics import auc
+
+from models.predict import calculate_probs
+from scripts.irof import IrofDataset
+from scripts.pixel_relevancy import PixelRelevancyDataset
+
+
+class ScoringMetric:
+    def __init__(self, model, scores, params):
+        self._model = model
+        self._params = params
+        self._scores = scores
+
+    def compute_batch_score(self, image_batch, label_batch, attributions):
+        for i, (image, label) in enumerate(zip(image_batch, label_batch)):
+            for scoring_method in self._params["scoring_methods"]:
+                for attr, title in zip(attributions[:, i], self._params["attribution_methods"]):
+                    scoring_dataset = self._make_scoring_dataset(
+                        scoring_method, image, attr
+                    )
+                    score = self._calc_score(scoring_dataset, label)
+                    self._scores[scoring_method][title].append(score)
+
+    def _make_scoring_dataset(self, scoring_method, image, attr):
+        device = image.device
+
+        if scoring_method == "insert":
+            dataset = PixelRelevancyDataset(
+                image, attr, True, self._params["scores_batch_size"],
+                self._params["package_size"], device
+            )
+        elif scoring_method == "delete":
+            dataset = PixelRelevancyDataset(
+                image, attr, False, self._params["scores_batch_size"],
+                self._params["package_size"], device
+            )
+        elif scoring_method == "irof":
+            dataset = IrofDataset(
+                image, attr, self._params["scores_batch_size"],
+                self._params["irof_segments"], self._params["irof_sigma"],
+                device
+            )
+        else:
+            raise ValueError
+
+        return dataset
+
+    def _calc_score(self, scoring_dataset, label):
+
+        probs = []
+        for img_batch in scoring_dataset:
+            probs += [calculate_probs(self._model, img_batch)[:, label]]
+
+        probs = torch.cat(probs)
+        rel_probs = probs / probs[-1]
+
+        x = np.arange(0, len(rel_probs))
+        y = rel_probs.detach().cpu().numpy()
+        score = auc(x, y) / len(rel_probs)
+
+        return score
+
+
+
+
+
+

@@ -6,6 +6,7 @@ def generate_attributions(image_batch, label_batch, model, methods, device="cpu"
 
     size = [len(methods)] + [image_batch.shape[0], image_batch.shape[2], image_batch.shape[3]]
     a = torch.empty(size=size).to(device)
+    image_batch.requires_grad = True
 
     for i, m in enumerate(methods):
 
