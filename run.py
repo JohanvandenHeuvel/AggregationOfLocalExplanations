@@ -36,7 +36,7 @@ params = {
     "batch_size": 50,
     "max_nr_batches": 5,
     "attribution_methods": ["deeplift", "saliency", "saliency", "occlusion", "smoothgrad", "guidedbackprop", "gray_image"] + ["noise_uniform"] * 0,
-    "ensemble_methods": ["mean", "variance"], #, "rbm", "flipped_rbm"],
+    "ensemble_methods": ["mean", "variance", "rbm", "flipped_rbm"],
     "attribution_processing": "filtering",
     "normalization": "min_max",
     "scoring_methods": ["insert", "delete", "irof"],
