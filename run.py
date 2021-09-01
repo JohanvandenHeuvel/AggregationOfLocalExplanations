@@ -15,6 +15,14 @@ import datetime
 import numpy as np
 
 import matplotlib.pyplot as plt
+import pandas as pd
+
+from scripts.attribution_methods import attribution_method, generate_attributions
+from scripts.normalize import normalize
+import scripts.datasets as datasets
+from scripts.ensemble import generate_ensembles
+from models.predict import predict_label
+from scripts.scoring_measures import calc_scores
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 torch.cuda.empty_cache()
@@ -32,14 +40,19 @@ os.makedirs(folder_path)
 #  experiment conditions  #
 ###########################
 params = {
-    "model": "Resnet18",
-    "dataset": "small_imagenet",
-    "batch_size": 2,
-    "attribution_methods": ["deeplift", "smoothgrad", "saliency"]
+    "model": "mnist_model",
+    "dataset": "mnist",
+    "batch_size": 10,
+    "attribution_methods": ["deeplift", "saliency"]
     + ["noise_uniform"] * 0,
     "ensemble_methods": ["mean", "variance", "rbm", "flipped_rbm"],
     "attribution_processing": "filtering",
     "normalization": "min_max",
+    "scores": ["insert", "delete", "irof"],  # TODO: New params have been added
+    "scores_batch_size": 3,
+    "package_size": 2,
+    "irof_segments": 60,
+    "irof_sigma": 4
 }
 
 
@@ -61,6 +74,9 @@ def main():
         dataset, batch_size=params["batch_size"], shuffle=False, num_workers=2
     )
 
+    scores = dict([(score, dict([(m, []) for m in params['attribution_methods']]))
+                   for score in params["scores"]])
+
     for i, (image_batch, label_batch) in tqdm(enumerate(dataloader)):
 
         # put data on gpu if possible
@@ -80,12 +96,19 @@ def main():
 
         # generate explanations
         attributions = generate_attributions(
-            image_batch[indices],
-            label_batch[indices],
-            model,
-            params["attribution_methods"],
-            device,
+            image_batch[indices], label_batch[indices], model, params["attribution_methods"], device,
         )
+
+        # TODO: Integrate it nicely, e.g. attributions & ensembles need to be handed over
+        calc_scores(model, image_batch, label_batch, attributions, params["attribution_methods"], scores, device,
+                    batch_size = params["scores_batch_size"], package_size = params["package_size"],
+                    irof_segments = params["irof_segments"], irof_sigma = params["irof_sigma"])
+        if i == 10:  # TODO: Integrate
+            create_statistics_table(scores)
+            return
+
+
+    for i in range(10):
 
         ###########################
         #  explanation processing #
@@ -149,6 +172,25 @@ def main():
 
         if i > 1:
             break
+
+
+def create_statistics_table(scores):
+    # For each method add mean and std column
+    columns = [[method + " mean", method + " std"] for method in scores.keys()]
+    columns = sum(columns, [])
+    columns = ["method"] + columns
+
+    data = []
+    for method in scores[list(scores.keys())[0]].keys():
+        data.append([method])
+
+    for statistic in scores.keys():
+        for j, method in enumerate(scores[statistic]):
+            data[j].append(np.mean(scores[statistic][method]))
+            data[j].append(np.std(scores[statistic][method]))
+
+    df = pd.DataFrame(data, columns=columns)
+    return df
 
 
 def my_plot(images, titles, save=False):

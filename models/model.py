@@ -21,7 +21,7 @@ def get_model(model_name, device="cpu"):
         net = resnet18(pretrained=True)
         # cifar10 has only 10 classes, while resnet has 1000 by default
         net.fc = nn.Linear(512, 10)
-        net.load_state_dict(torch.load("cifar10.pt"))
+        net.load_state_dict(torch.load("cifar10.pt", map_location=device))
     elif model_name == "VGG-19":
         net = models.vgg19(pretrained=True)
     elif model_name == "mnist_model":
