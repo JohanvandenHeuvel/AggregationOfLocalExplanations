@@ -13,8 +13,16 @@ def generate_ensembles(attributions, methods, device="cpu"):
     e = torch.empty(size=size).to(device)
 
     for i, m in enumerate(methods):
-        ens = ensemble(m, attributions=attributions)
-        e[i] = ens
+
+        # TOOO temporary solution
+        if m == "flipped_rbm":
+            # TODO flip by 1- or 1/
+            # add flipped rbm
+            j = methods.index("rbm")
+            e[i] = 1 / e[j]
+        else:
+            ens = ensemble(m, attributions=attributions)
+            e[i] = ens
 
     return e
 

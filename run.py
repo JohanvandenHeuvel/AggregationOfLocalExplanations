@@ -34,10 +34,10 @@ os.makedirs(folder_path)
 params = {
     "model": "Resnet18",
     "dataset": "small_imagenet",
-    "batch_size": 8,
-    "attribution_methods": ["deeplift", "saliency"]
+    "batch_size": 2,
+    "attribution_methods": ["deeplift", "smoothgrad", "saliency"]
     + ["noise_uniform"] * 0,
-    "ensemble_methods": ["mean", "variance", "rbm"],
+    "ensemble_methods": ["mean", "variance", "rbm", "flipped_rbm"],
     "attribution_processing": "filtering",
     "normalization": "min_max",
 }
@@ -80,7 +80,11 @@ def main():
 
         # generate explanations
         attributions = generate_attributions(
-            image_batch[indices], label_batch[indices], model, params["attribution_methods"], device,
+            image_batch[indices],
+            label_batch[indices],
+            model,
+            params["attribution_methods"],
+            device,
         )
 
         ###########################
@@ -108,10 +112,15 @@ def main():
             attributions, params["ensemble_methods"], device
         )
 
+        # make sure it sums to 1
+        ensemble_attributions = normalize(
+            params["normalization"], arr=ensemble_attributions
+        )
+
         ###########################
         #      plot examples      #
         ###########################
-        for idx in range(8):
+        for idx in range(params["batch_size"]):
             # idx = 0  # first image of the batch
             original_img = (
                 torch.mean(image_batch[indices], dim=1)[idx].cpu().detach().numpy()
@@ -133,11 +142,13 @@ def main():
                 images,
                 ["original"]
                 + params["attribution_methods"]
-                + params["ensemble_methods"],
+                + params["ensemble_methods"]
+                + ["flipped_rbm"],
                 save=False,
             )
 
-        break
+        if i > 1:
+            break
 
 
 def my_plot(images, titles, save=False):
