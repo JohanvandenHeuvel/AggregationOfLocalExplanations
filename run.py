@@ -1,20 +1,20 @@
 import torch
 
+from models.model import get_model
+import json
+from tqdm import tqdm
+import os
+import datetime
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+
 from scripts.run_experiment import *
 from scripts.attribution_methods import attribution_method, generate_attributions
 from scripts.normalize import normalize
 import scripts.datasets as datasets
 from scripts.ensemble import generate_ensembles
-from models.model import get_model
-import json
-from tqdm import tqdm
-
-import os
-import datetime
-
-import numpy as np
-
-import matplotlib.pyplot as plt
+from scripts.scoring_measures import calc_scores
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 torch.cuda.empty_cache()
@@ -32,14 +32,19 @@ os.makedirs(folder_path)
 #  experiment conditions  #
 ###########################
 params = {
-    "model": "Resnet18",
-    "dataset": "small_imagenet",
-    "batch_size": 8,
+    "model": "mnist_model",
+    "dataset": "mnist",
+    "batch_size": 10,
     "attribution_methods": ["deeplift", "saliency"]
     + ["noise_uniform"] * 0,
     "ensemble_methods": ["mean", "variance", "rbm"],
     "attribution_processing": "filtering",
     "normalization": "min_max",
+    "scores": ["insert", "delete", "irof"],  # TODO: New params have been added
+    "scores_btach_size": 80,
+    "package_size": 2,
+    "irof_segments": 60,
+    "irof_sigma": 4
 }
 
 
@@ -61,7 +66,13 @@ def main():
         dataset, batch_size=params["batch_size"], shuffle=False, num_workers=2
     )
 
-    for i, (image_batch, label_batch) in tqdm(enumerate(dataloader)):
+
+    scores = dict([(score, dict([(m, []) for m in params["attribution_methods"]])) for score in params["scores"]])
+
+    # TODO: I needed to change this for loop, beacuse PyCharm made a lot of problems with it. We can add it later again.
+    # for i, (image_batch, label_batch) in tqdm(enumerate(dataloader)):
+    for i in tqdm(range(dataloader.__len__())):
+        image_batch, label_batch = next(iter(dataloader))
 
         # put data on gpu if possible
         image_batch = image_batch.to(device)
@@ -82,6 +93,17 @@ def main():
         attributions = generate_attributions(
             image_batch[indices], label_batch[indices], model, params["attribution_methods"], device,
         )
+
+        # TODO: Integrate it nicely, e.g. attributions & ensembles need to be handed over
+        calc_scores(model, image_batch, label_batch, attributions, params["attribution_methods"], scores,
+                    params["scores_btach_size"], params["package_size"], params["irof_segments"], params["irof_sigma"],
+                    device)
+        if i == 10:  # TODO: Integrate
+            create_statistics_table(scores)
+            return
+
+
+    for i in range(10):
 
         ###########################
         #  explanation processing #
@@ -138,6 +160,25 @@ def main():
             )
 
         break
+
+
+def create_statistics_table(scores):
+    # For each method add mean and std column
+    columns = [[method + " mean", method + " std"] for method in scores.keys()]
+    columns = sum(columns, [])
+    columns = ["method"] + columns
+
+    data = []
+    for method in scores[list(scores.keys())[0]].keys():
+        data.append([method])
+
+    for statistic in scores.keys():
+        for j, method in enumerate(scores[statistic]):
+            data[j].append(np.mean(scores[statistic][method]))
+            data[j].append(np.std(scores[statistic][method]))
+
+    df = pd.DataFrame(data, columns=columns)
+    return df
 
 
 def my_plot(images, titles, save=False):
