@@ -1,10 +1,5 @@
 import torch
 
-from scripts.run_experiment import *
-from scripts.attribution_methods import attribution_method, generate_attributions
-from scripts.normalize import normalize
-import scripts.datasets as datasets
-from scripts.ensemble import generate_ensembles
 from models.model import get_model
 import json
 from tqdm import tqdm
@@ -43,16 +38,15 @@ params = {
     "model": "mnist_model",
     "dataset": "mnist",
     "batch_size": 10,
-    "attribution_methods": ["deeplift", "saliency"]
-    + ["noise_uniform"] * 0,
+    "attribution_methods": ["deeplift", "saliency"] + ["noise_uniform"] * 0,
     "ensemble_methods": ["mean", "variance", "rbm", "flipped_rbm"],
     "attribution_processing": "filtering",
     "normalization": "min_max",
-    "scores": ["insert", "delete", "irof"],  # TODO: New params have been added
+    "scoring_methods": ["insert", "delete", "irof"],  # TODO: New params have been added
     "scores_batch_size": 3,
     "package_size": 2,
     "irof_segments": 60,
-    "irof_sigma": 4
+    "irof_sigma": 4,
 }
 
 
@@ -63,20 +57,20 @@ def main():
     # classification model
     model = get_model(params["model"], device=device)
 
-    # # methods for explaining
-    # attribution_methods = [
-    #     attribution_method(method, model) for method in params["attribution_methods"]
-    # ]
-
     # dataset and which images to explain the classification for
     dataset = datasets.get_dataset(params["dataset"])
     dataloader = torch.utils.data.DataLoader(
         dataset, batch_size=params["batch_size"], shuffle=False, num_workers=2
     )
 
-    scores = dict([(score, dict([(m, []) for m in params['attribution_methods']]))
-                   for score in params["scores"]])
+    scores = dict(
+        [
+            (score, dict([(m, []) for m in params["attribution_methods"]]))
+            for score in params["scoring_methods"]
+        ]
+    )
 
+    # TODO remove splitting of the tuple, most functions can use the tuple as is
     for i, (image_batch, label_batch) in tqdm(enumerate(dataloader)):
 
         # put data on gpu if possible
@@ -96,17 +90,26 @@ def main():
 
         # generate explanations
         attributions = generate_attributions(
-            image_batch[indices], label_batch[indices], model, params["attribution_methods"], device,
+            image_batch[indices],
+            label_batch[indices],
+            model,
+            params["attribution_methods"],
+            device,
         )
 
         # TODO: Integrate it nicely, e.g. attributions & ensembles need to be handed over
-        calc_scores(model, image_batch, label_batch, attributions, params["attribution_methods"], scores, device,
-                    batch_size = params["scores_batch_size"], package_size = params["package_size"],
-                    irof_segments = params["irof_segments"], irof_sigma = params["irof_sigma"])
+        calc_scores(
+            model,
+            image_batch,
+            label_batch,
+            attributions,
+            scores,
+            params,
+        )
+
         if i == 10:  # TODO: Integrate
             create_statistics_table(scores)
             return
-
 
     for i in range(10):
 
