@@ -27,26 +27,6 @@ def image_4D_to_3D(image):
     return image.reshape(-1, image.size()[2], image.size()[3])
 
 
-# class Dataset:
-#     def __init__(self):
-#         self.dataset = None
-#
-#     @abstractmethod
-#     def preprocess_pil(self, image):
-#         pass
-#
-#     @abstractmethod
-#     def preprocess_tensor(self, image):
-#         pass
-#
-#     # def get_raw_image(self, idx):
-#     #     img, label = self.dataset[idx]
-#     #     return img, label
-#
-#     # def get_image(self, idx):
-#     #     raw_image, _ = self.dataset[idx]
-#     #     return self.preprocess_tensor(raw_image).to(self.device)
-
 
 def MNIST():
 
@@ -95,13 +75,3 @@ def SmallImagenet():
     return dataset
 
 
-# def normalize(self, image):
-#     if image.max() > 1:
-#         image /= 255
-#     image = (image - self.mean) / self.std
-#     # in addition, roll the axis so that they suit pytorch
-#     return torch.tensor(image.swapaxes(-1, 1).swapaxes(2, 3)).float()
-#
-# def get_image(self, idx):
-#     X = self.dataset[idx]
-#     return self.normalize(X).to(self.device)

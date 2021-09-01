@@ -9,11 +9,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from scripts.run_experiment import *
 from scripts.attribution_methods import attribution_method, generate_attributions
 from scripts.normalize import normalize
 import scripts.datasets as datasets
 from scripts.ensemble import generate_ensembles
+from models.predict import predict_label
 from scripts.scoring_measures import calc_scores
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -41,7 +41,7 @@ params = {
     "attribution_processing": "filtering",
     "normalization": "min_max",
     "scores": ["insert", "delete", "irof"],  # TODO: New params have been added
-    "scores_btach_size": 80,
+    "scores_batch_size": 3,
     "package_size": 2,
     "irof_segments": 60,
     "irof_sigma": 4
@@ -95,9 +95,9 @@ def main():
         )
 
         # TODO: Integrate it nicely, e.g. attributions & ensembles need to be handed over
-        calc_scores(model, image_batch, label_batch, attributions, params["attribution_methods"], scores,
-                    params["scores_btach_size"], params["package_size"], params["irof_segments"], params["irof_sigma"],
-                    device)
+        calc_scores(model, image_batch, label_batch, attributions, params["attribution_methods"], scores, device,
+                    batch_size = params["scores_batch_size"], package_size = params["package_size"],
+                    irof_segments = params["irof_segments"], irof_sigma = params["irof_sigma"])
         if i == 10:  # TODO: Integrate
             create_statistics_table(scores)
             return

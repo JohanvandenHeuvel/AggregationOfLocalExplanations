@@ -2,64 +2,49 @@ import numpy as np
 import abc
 import torch
 from skimage.segmentation import slic
-import torch.nn.functional as F
 from sklearn.metrics import auc
 from torch.utils.data import Dataset
 from numpy.lib import recfunctions as rfn
-from captum.metrics import sensitivity_max
+
+from models.predict import calculate_probs
 
 # TODO: I still have the broad PyCharm setting.
 
-# TODO: The methods have quite a few parameters. Can we reduce that? **kwargs?
-def calc_scores(model, image_batch, label_batch, attributions, attributions_title,
-                scores, batch_size, package_size, irof_segments, irof_sigma, device):
-
+def calc_scores(model, image_batch, label_batch, attributions, attr_titles, scores, device, **kwargs):
     for i, (image, label) in enumerate(zip(image_batch, label_batch)):
-
         for scoring_method in scores.keys():
-
-            calc_scores_manually(scores, scoring_method, model, image, label, attributions[:, i],
-                                 attributions_title, batch_size, package_size,
-                                 irof_segments, irof_sigma, device)
-
-# TODO: Do we want to make one method for things like that?
-def calculate_probs(model, label, input_data):
-    if torch.cuda.is_available():
-        torch.cuda.empty_cachge()
-        torch.cuda.reset_peak_memory_stats()
-    input_data.requires_grad = False
-    model.eval()
-
-    result = F.softmax(model(input_data), dim=1)
-    probs = result[:, label]
-    return probs
+            for attr, title in zip(attributions[:,i], attr_titles):
+                score = calc_score(model, scoring_method, image, label, attr, device, **kwargs)
+                scores[scoring_method][title].append(score)
 
 
-def calc_scores_manually(scores, scoring_method, model, image, label, attributions, attributions_title, batch_size,
-                         package_size, irof_segments, irof_sigma, device):
-    for attr, title in zip(attributions, attributions_title):
+def calc_score(model, scoring_method, image, label, attr, device, **kwargs):
+    batch_size = kwargs.pop("batch_size", 10)
+    package_size = kwargs.pop("package_size", 1)
+    irof_segments = kwargs.pop("irof_segments", 60)
+    irof_sigma = kwargs.pop("irof_sigma", 5)
 
-        if scoring_method == "insert":
-            dataset = PixelRelevancyDataset(image, attr, True, batch_size, package_size, device)
-        elif scoring_method == "delete":
-            dataset = PixelRelevancyDataset(image, attr, False, batch_size, package_size, device)
-        elif scoring_method == "irof":
-            dataset = IrofDataset(image, attr, batch_size, irof_segments, irof_sigma, device)
-        else:
-            raise ValueError
+    if scoring_method == "insert":
+        dataset = PixelRelevancyDataset(image, attr, True, batch_size, package_size, device)
+    elif scoring_method == "delete":
+        dataset = PixelRelevancyDataset(image, attr, False, batch_size, package_size, device)
+    elif scoring_method == "irof":
+        dataset = IrofDataset(image, attr, batch_size, irof_segments, irof_sigma, device)
+    else:
+        raise ValueError
 
-        probs = []
-        for img_batch in dataset:
-            probs += [calculate_probs(model, label, img_batch)]
+    probs = []
+    for img_batch in dataset:
+        probs += [calculate_probs(model, img_batch)[:, label]]
 
-        probs = torch.cat(probs)
-        rel_probs = probs / probs[-1]
+    probs = torch.cat(probs)
+    rel_probs = probs / probs[-1]
 
-        x = np.arange(0, len(rel_probs))
-        y = rel_probs.detach().cpu().numpy()
-        score = auc(x, y) / len(rel_probs)
+    x = np.arange(0, len(rel_probs))
+    y = rel_probs.detach().cpu().numpy()
+    score = auc(x, y) / len(rel_probs)
 
-        scores[scoring_method][title].append(score)
+    return score
 
 
 class PixelManipulationBase(Dataset):
@@ -78,8 +63,7 @@ class PixelManipulationBase(Dataset):
 
         # Baseline = Mean color
         self._baseline = torch.mean(image.reshape(self.color_channels, self.width, self.height), dim=(1, 2))
-        # if len(self._baseline) == 0:
-        #    self._baseline = self._baseline[0]
+
         self._temp_baseline = None
         self._temp_image = None
 
@@ -225,8 +209,8 @@ class PixelRelevancyDataset(PixelManipulationBase):
     def _get_fake_image_size(self):
         return self._package_size
 
-# TODO: Some parts of IrofDataset and PixelRelevancyDataset are redundant. It might be possible to merge them.
-# I became only aware later of that
+# TODO: Some parts of IrofDataset and PixelRelevancyDataset may be redundant, because they are optimized.
+# It maybe be possible to merge some parts, but I would focus on other things now
 class IrofDataset(PixelManipulationBase):
     def __init__(self, image, attribution, batch_size, irof_segments, irof_sigma, device):
         PixelManipulationBase.__init__(self, image,  attribution, False, batch_size, device)

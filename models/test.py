@@ -1,7 +1,5 @@
 import torch
 
-from scripts.plot import plot_batch
-
 
 def test(net, testloader):
     correct = 0
@@ -48,8 +46,6 @@ def class_accuracy(net, testloader, classes):
 def test_batch(net, testloader, classes):
     dataiter = iter(testloader)
     images, labels = dataiter.next()
-
-    plot_batch(images, labels, classes)
 
     outputs = net(images)
 
