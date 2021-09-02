@@ -31,12 +31,12 @@ os.makedirs(folder_path)
 #  experiment conditions  #
 ###########################
 params = {
-    "model": "Resnet18_cifar10",
-    "dataset": "cifar10",
-    "batch_size": 50,
-    "max_nr_batches": 5,
-    "attribution_methods": ["deeplift", "saliency", "saliency", "occlusion", "smoothgrad", "guidedbackprop", "gray_image"] + ["noise_uniform"] * 0,
-    "ensemble_methods": ["mean", "variance", "rbm", "flipped_rbm"],
+    "model": "mnist_model",
+    "dataset": "mnist",
+    "batch_size": 20,
+    "max_nr_batches": 1,
+    "attribution_methods": ["deeplift", "saliency", "occlusion", "smoothgrad", "guidedbackprop", "gray_image"] + ["noise_uniform"] * 0,
+    "ensemble_methods": ["mean", "variance", "rbm", "flipped_rbm", "rbm_flip_detection"],
     "attribution_processing": "filtering",
     "normalization": "min_max",
     "scoring_methods": ["insert", "delete", "irof"],
@@ -60,7 +60,7 @@ def main():
         dataset, batch_size=params["batch_size"], shuffle=False, num_workers=2
     )
 
-    # Preparation for score comoputation later
+    # Preparation for score computation later
     attr_titles = params["attribution_methods"] + params["ensemble_methods"]
     scores = dict(
         [
@@ -70,8 +70,11 @@ def main():
     )
     metric = ScoringMetric(model, scores, params)
 
+    # TODO: Remove later
+    # for i in tqdm(range(len(dataloader))):
+    #     (image_batch, label_batch) = next(dataloader.__iter__())
     for i, (image_batch, label_batch) in tqdm(enumerate(dataloader)):
-
+    
         # put data on gpu if possible
         image_batch = image_batch.to(device)
         label_batch = label_batch.to(device)
@@ -189,7 +192,7 @@ def create_score_table(scores):
             data[j].append(np.mean(scores[statistic][method]))
             data[j].append(np.std(scores[statistic][method]))
 
-        # Compoute rbm_ideal
+        # Compute rbm_ideal
         # For every score pair of rbm and rbm_flipped, pick the better one.
         function = np.min if statistic == "delete" else np.max
         rbms = np.asarray([scores[statistic]["rbm"], scores[statistic]["flipped_rbm"]])

@@ -24,7 +24,7 @@ class ScoringMetric:
         for i, (image, label) in enumerate(zip(image_batch, label_batch)):
             for scoring_method in self._params["scoring_methods"]:
                 for attr, title in zip(all_attributions[:, i], attr_titles):
-                    if title == "noise_normal" or "noise_uniform" == title:
+                    if title == "noise_normal" or title == "noise_uniform":
                         continue
 
                     scoring_dataset = self._make_scoring_dataset(
