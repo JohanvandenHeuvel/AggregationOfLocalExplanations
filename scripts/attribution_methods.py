@@ -21,7 +21,8 @@ def generate_attributions(image_batch, label_batch, model, params, device="cpu")
 
     for i, m in enumerate(methods):
 
-        if m == "lime":
+        if m == "lime" or m == "gradientshap":
+            # TODO if doing in batches then gradientshap doesn't use one label per sample
             method = attribution_method(m, model)
             attr = torch.empty(size=image_batch.shape).to(device)
             for idx, img in enumerate(image_batch):
@@ -56,6 +57,9 @@ def attribution_method(name, model, **kwargs):
 
     if name == "lime":
         return lime(model, **kwargs)
+
+    if name == "gradientshap":
+        return gradientshap(model, **kwargs)
 
     if name == "gray_image":
         return gray_image(**kwargs)
@@ -135,12 +139,24 @@ def lime(model):
 
     def f(x, y):
         lime_attr = Lime(
-            model,
-            SkLearnLinearRegression(),
-            similarity_func=exp_eucl_distance,
+            model, SkLearnLinearRegression(), similarity_func=exp_eucl_distance,
         )
         return lime_attr.attribute(
-            x.unsqueeze(0), target=y.unsqueeze(0), n_samples=256, perturbations_per_eval=128
+            x.unsqueeze(0),
+            target=y.unsqueeze(0),
+            n_samples=256,
+            perturbations_per_eval=128,
+        )
+
+    return f
+
+
+def gradientshap(model):
+    def f(x, y):
+        # Defining baseline distribution of images
+        rand_img_dist = torch.cat([x.unsqueeze(0) * 0, x.unsqueeze(0) * 1])
+        return GradientShap(model).attribute(
+            x.unsqueeze(0), target=y.unsqueeze(0), baselines=rand_img_dist
         )
 
     return f

@@ -35,9 +35,10 @@ params = {
     "model": "Resnet18_cifar10",
     # "model": "mnist_model",
     "dataset": "cifar10",
-    "batch_size": 3,
+    "batch_size": 20,
     "max_nr_batches": 1,
     "attribution_methods": [
+        "gradientshap",
         "deeplift",
         "lime",
         "saliency",
@@ -158,7 +159,7 @@ def main():
         ###########################
         #      plot examples      #
         ###########################
-        for idx in range(params["batch_size"]):
+        for idx in range(len(indices)):
             # idx = 0  # first image of the batch
             original_img = (
                 torch.mean(image_batch[indices], dim=1)[idx].cpu().detach().numpy()
