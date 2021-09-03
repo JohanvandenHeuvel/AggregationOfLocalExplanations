@@ -31,11 +31,13 @@ os.makedirs(folder_path)
 #  experiment conditions  #
 ###########################
 params = {
+    # "model": "Resnet18_cifar10",
     "model": "mnist_model",
     "dataset": "mnist",
-    "batch_size": 20,
+    "batch_size": 10,
     "max_nr_batches": 1,
     "attribution_methods": ["deeplift", "saliency", "occlusion", "smoothgrad", "guidedbackprop", "gray_image"] + ["noise_uniform"] * 0,
+    # "attribution_methods": ["lime"] + ["noise_uniform"] * 0,
     "ensemble_methods": ["mean", "variance", "rbm", "flipped_rbm", "rbm_flip_detection"],
     "attribution_processing": "filtering",
     "normalization": "min_max",
@@ -95,7 +97,7 @@ def main():
             image_batch[indices],
             label_batch[indices],
             model,
-            params["attribution_methods"],
+            params,
             device,
         )
 
@@ -139,32 +141,32 @@ def main():
         ###########################
         #      plot examples      #
         ###########################
-        # for idx in range(params["batch_size"]):
-        #     # idx = 0  # first image of the batch
-        #     original_img = (
-        #         torch.mean(image_batch[indices], dim=1)[idx].cpu().detach().numpy()
-        #     )
-        #     images = [original_img]
-        #
-        #     # TODO don't plot noise attributions
-        #     # one image for every attribution method
-        #     for j in range(len(params["attribution_methods"])):
-        #         attribution_img = attributions[j][idx].cpu().detach().numpy()
-        #         images.append(attribution_img)
-        #
-        #     # one image for every ensemble method
-        #     for j in range(len(params["ensemble_methods"])):
-        #         ensemble_img = ensemble_attributions[j][idx].cpu().detach().numpy()
-        #         images.append(ensemble_img)
-        #
-        #     my_plot(
-        #         images,
-        #         ["original"]
-        #         + params["attribution_methods"]
-        #         + params["ensemble_methods"]
-        #         + ["flipped_rbm"],
-        #         save=False,
-        #     )
+        for idx in range(params["batch_size"]):
+            # idx = 0  # first image of the batch
+            original_img = (
+                torch.mean(image_batch[indices], dim=1)[idx].cpu().detach().numpy()
+            )
+            images = [original_img]
+
+            # TODO don't plot noise attributions
+            # one image for every attribution method
+            for j in range(len(params["attribution_methods"])):
+                attribution_img = attributions[j][idx].cpu().detach().numpy()
+                images.append(attribution_img)
+
+            # one image for every ensemble method
+            for j in range(len(params["ensemble_methods"])):
+                ensemble_img = ensemble_attributions[j][idx].cpu().detach().numpy()
+                images.append(ensemble_img)
+
+            my_plot(
+                images,
+                ["original"]
+                + params["attribution_methods"]
+                + params["ensemble_methods"]
+                + ["flipped_rbm"],
+                save=False,
+            )
 
         if i+1 >= params["max_nr_batches"]:
             write_scores_to_file(scores)

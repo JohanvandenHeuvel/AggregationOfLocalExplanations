@@ -1,19 +1,38 @@
 from captum.attr import *
 import torch
 
+from captum._utils.models.linear_model import SkLearnLinearRegression, SkLearnLasso
+from captum.attr._core.lime import get_exp_kernel_similarity_function
 
-def generate_attributions(image_batch, label_batch, model, methods, device="cpu"):
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    size = [len(methods)] + [image_batch.shape[0], image_batch.shape[2], image_batch.shape[3]]
+
+def generate_attributions(image_batch, label_batch, model, params, device="cpu"):
+
+    methods = params["attribution_methods"]
+
+    size = [len(methods)] + [
+        image_batch.shape[0],
+        image_batch.shape[2],
+        image_batch.shape[3],
+    ]
     a = torch.empty(size=size).to(device)
     image_batch.requires_grad = True
 
     for i, m in enumerate(methods):
 
-        method = attribution_method(m, model)
-        attr = method(image_batch, label_batch)
+        if m == "lime":
+            method = attribution_method(m, model)
+            attr = torch.empty(size=a[0].shape)
+            for idx, img in enumerate(image_batch):
+                foo = method(img, label_batch[idx])
+                attr[idx] = foo
+        else:
+            method = attribution_method(m, model)
+            attr = method(image_batch, label_batch)
         # sum over the color channels
-        attr = torch.mean(attr, dim=1)
+        if len(attr.shape) > 3:
+            attr = torch.mean(attr, dim=1)
         a[i] = attr
 
     return a
@@ -35,6 +54,9 @@ def attribution_method(name, model, **kwargs):
     if name == "smoothgrad":
         return smoothgrad(model, **kwargs)
 
+    if name == "lime":
+        return lime(model, **kwargs)
+
     if name == "gray_image":
         return gray_image(**kwargs)
 
@@ -53,7 +75,6 @@ def attribute_image_features(model, name, input, label, **kwargs):
 
 
 def deeplift(model, **kwargs):
-
     def f(x, y):
         return DeepLift(model).attribute(x, target=y, **kwargs)
 
@@ -84,11 +105,13 @@ def smoothgrad(model, **kwargs):
     )
     return f
 
+
 def gray_image(**kwargs):
     def f(x, y):
         return torch.mean(x, dim=1).unsqueeze(1)
 
     return f
+
 
 def noise_normal(**kwargs):
     def f(x, y):
@@ -100,5 +123,24 @@ def noise_normal(**kwargs):
 def noise_uniform(**kwargs):
     def f(x, y):
         return torch.rand(x.shape).to(x.device)
+
+    return f
+
+
+def lime(model):
+
+    exp_eucl_distance = get_exp_kernel_similarity_function(
+        "euclidean", kernel_width=1000
+    )
+
+    def f(x, y):
+        lime_attr = Lime(
+            model,
+            SkLearnLinearRegression(),
+            similarity_func=exp_eucl_distance,
+        )
+        return lime_attr.attribute(
+            x.unsqueeze(0), target=y.unsqueeze(0), n_samples=256, perturbations_per_eval=128
+        )
 
     return f
