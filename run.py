@@ -9,6 +9,7 @@ import pandas as pd
 
 from models.model import get_model
 from scripts.attribution_methods import attribution_method, generate_attributions
+from captum.attr import visualization as viz
 from scripts.normalize import normalize
 import scripts.datasets as datasets
 from scripts.ensemble import generate_ensembles
@@ -34,11 +35,26 @@ params = {
     # "model": "Resnet18_cifar10",
     "model": "mnist_model",
     "dataset": "mnist",
-    "batch_size": 10,
+    "batch_size": 3,
     "max_nr_batches": 1,
-    "attribution_methods": ["deeplift", "saliency", "occlusion", "smoothgrad", "guidedbackprop", "gray_image"] + ["noise_uniform"] * 0,
+    "attribution_methods": [
+        "deeplift",
+        "lime",
+        "saliency",
+        "occlusion",
+        "smoothgrad",
+        "guidedbackprop",
+        "gray_image",
+    ]
+    + ["noise_uniform"] * 0,
     # "attribution_methods": ["lime"] + ["noise_uniform"] * 0,
-    "ensemble_methods": ["mean", "variance", "rbm", "flipped_rbm", "rbm_flip_detection"],
+    "ensemble_methods": [
+        "mean",
+        "variance",
+        "rbm",
+        "flipped_rbm",
+        "rbm_flip_detection",
+    ],
     "attribution_processing": "filtering",
     "normalization": "min_max",
     "scoring_methods": ["insert", "delete", "irof"],
@@ -76,7 +92,7 @@ def main():
     # for i in tqdm(range(len(dataloader))):
     #     (image_batch, label_batch) = next(dataloader.__iter__())
     for i, (image_batch, label_batch) in tqdm(enumerate(dataloader)):
-    
+
         # put data on gpu if possible
         image_batch = image_batch.to(device)
         label_batch = label_batch.to(device)
@@ -94,11 +110,7 @@ def main():
 
         # generate explanations
         attributions = generate_attributions(
-            image_batch[indices],
-            label_batch[indices],
-            model,
-            params,
-            device,
+            image_batch[indices], label_batch[indices], model, params, device,
         )
 
         ###########################
@@ -135,7 +147,12 @@ def main():
         #       statistics        #
         ###########################
 
-        metric.compute_batch_score(image_batch[indices], label_batch[indices], attributions, ensemble_attributions)
+        metric.compute_batch_score(
+            image_batch[indices],
+            label_batch[indices],
+            attributions,
+            ensemble_attributions,
+        )
 
         # TODO: Uncommented, maybe put into a separate function
         ###########################
@@ -168,7 +185,7 @@ def main():
                 save=False,
             )
 
-        if i+1 >= params["max_nr_batches"]:
+        if i + 1 >= params["max_nr_batches"]:
             write_scores_to_file(scores)
             score_table = create_score_table(scores)
             pd.options.display.width = 0
@@ -214,11 +231,20 @@ def my_plot(images, titles, save=False):
     # plot the images
     for i, ax in enumerate(axs.flatten()):
         if i < len(images):
-            im = ax.imshow(images[i])
-            ax.set_title(titles[i])
-            fig.colorbar(im, ax=ax)
+            viz.visualize_image_attr(
+                images[i][..., np.newaxis],
+                # attr_map.permute(1, 2, 0).numpy(),  # adjust shape to height, width, channels
+                method="heat_map",
+                sign="all",
+                show_colorbar=True,
+                title=titles[i],
+                plt_fig_axis=(fig, ax),
+                use_pyplot=False,
+            )
         else:
             ax.set_visible(False)
+
+    plt.tight_layout()
 
     if save:
         file_name = now.strftime("%m-%d_@%H-%M-%S.png")
@@ -226,6 +252,18 @@ def my_plot(images, titles, save=False):
         fig.savefig(file_path, dpi=fig.dpi)
     else:
         plt.show()
+
+
+def show_attr(attr_map, title, plot_loc):
+    viz.visualize_image_attr(
+        attr_map[..., np.newaxis],
+        # attr_map.permute(1, 2, 0).numpy(),  # adjust shape to height, width, channels
+        method="heat_map",
+        sign="all",
+        show_colorbar=True,
+        title=title,
+        plt_fig_axis=plot_loc,
+    )
 
 
 def write_params_to_disk():
