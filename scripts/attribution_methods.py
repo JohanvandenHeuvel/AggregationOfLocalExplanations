@@ -112,7 +112,7 @@ def smoothgrad(model, **kwargs):
 
 def gray_image(**kwargs):
     def f(x, y):
-        return torch.mean(x, dim=1).unsqueeze(1)
+        return x
 
     return f
 
