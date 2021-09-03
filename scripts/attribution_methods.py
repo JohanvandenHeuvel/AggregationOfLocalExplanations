@@ -23,7 +23,7 @@ def generate_attributions(image_batch, label_batch, model, params, device="cpu")
 
         if m == "lime":
             method = attribution_method(m, model)
-            attr = torch.empty(size=a[0].shape)
+            attr = torch.empty(size=image_batch.shape).to(device)
             for idx, img in enumerate(image_batch):
                 foo = method(img, label_batch[idx])
                 attr[idx] = foo

@@ -32,9 +32,9 @@ os.makedirs(folder_path)
 #  experiment conditions  #
 ###########################
 params = {
-    # "model": "Resnet18_cifar10",
-    "model": "mnist_model",
-    "dataset": "mnist",
+    "model": "Resnet18_cifar10",
+    # "model": "mnist_model",
+    "dataset": "cifar10",
     "batch_size": 3,
     "max_nr_batches": 1,
     "attribution_methods": [
