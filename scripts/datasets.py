@@ -19,35 +19,6 @@ def get_dataset(name):
     raise ValueError
 
 
-def get_tensor_transform(name):
-
-    if name == "mnist":
-        return MNIST().transform
-
-    if name == "cifar10":
-        return Cifar10().transform
-
-    raise ValueError
-
-
-def get_pil_transform(name):
-
-    if name == "cifar10":
-
-        def f(image):
-            return image
-
-        return f
-
-
-def image_3D_to_4D(image):
-    return image.reshape(-1, image.size()[0], image.size()[1], image.size()[2])
-
-
-def image_4D_to_3D(image):
-    return image.reshape(-1, image.size()[2], image.size()[3])
-
-
 class MNIST:
     def __init__(self, normalized=True):
 

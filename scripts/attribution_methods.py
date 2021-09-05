@@ -1,8 +1,9 @@
 from captum.attr import *
 import torch
-
 from captum._utils.models.linear_model import SkLearnLinearRegression, SkLearnLasso
 from captum.attr._core.lime import get_exp_kernel_similarity_function
+from kornia.filters import gaussian_blur2d
+
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -20,7 +21,6 @@ def generate_attributions(image_batch, label_batch, model, params, device="cpu")
     image_batch.requires_grad = True
 
     for i, m in enumerate(methods):
-
         if m == "lime" or m == "gradientshap":
             # TODO if doing in batches then gradientshap doesn't use one label per sample
             method = attribution_method(m, model)
@@ -28,6 +28,9 @@ def generate_attributions(image_batch, label_batch, model, params, device="cpu")
             for idx, img in enumerate(image_batch):
                 foo = method(img, label_batch[idx])
                 attr[idx] = foo
+        elif "integrated_gradients" in m:
+            method = attribution_method(m, model, device=device, color_dim=image_batch.shape[1])
+            attr = method(image_batch, label_batch)
         else:
             method = attribution_method(m, model)
             attr = method(image_batch, label_batch)
@@ -40,6 +43,14 @@ def generate_attributions(image_batch, label_batch, model, params, device="cpu")
 
 
 def attribution_method(name, model, **kwargs):
+    if "integrated_gradients" in name:
+        if "random" in name:
+            return integrated_gradients(model, "random", **kwargs)
+        if "blur" in name:
+            return integrated_gradients(model, "blur", **kwargs)
+        else:
+            return integrated_gradients(model, "black", **kwargs)
+
     if name == "deeplift":
         return deeplift(model, **kwargs)
 
@@ -76,6 +87,30 @@ def attribute_image_features(model, name, input, label, **kwargs):
     algorithm = attribution_method(name, model, **kwargs)
     tensor_attributions = algorithm(input, label)
     return tensor_attributions
+
+
+def integrated_gradients(model, baseline, **kwargs):
+    device = kwargs.get("devicce", "cpu")
+    color_dim = kwargs.get("color_dim", None)
+
+    if baseline == "blur":
+        def f(x, y):
+            x = gaussian_blur2d(x, (3, 3), (4, 4))
+            return IntegratedGradients(model).attribute(x, target=y)
+        return f
+
+    else:
+        if baseline == "black":
+            color = torch.Tensor([0]).float().expand((color_dim)).to(device)
+        elif baseline == "random":
+            color = torch.rand((color_dim)).float().to(device)
+
+        def f(x, y):
+            baseline_color = color.reshape(1, -1, 1, 1)
+            baselines = baseline_color.expand(x.shape[0], x.shape[1], x.shape[2], x.shape[3])
+            return IntegratedGradients(model).attribute(x, target=y, baselines=baselines)
+
+        return f
 
 
 def deeplift(model, **kwargs):
