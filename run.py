@@ -38,14 +38,16 @@ params = {
     "batch_size": 10,
     "max_nr_batches": 1,
     "attribution_methods": [
-        "gradientshap",
-        "deeplift",
-        "lime",
-        "saliency",
-        "occlusion",
-        "smoothgrad",
-        "guidedbackprop",
-        "gray_image",
+        # "gradientshap",
+        # "deeplift",
+        "lime_1",
+        "lime_2",
+        "lime_3",
+        # "saliency",
+        # "occlusion",
+        # "smoothgrad",
+        # "guidedbackprop",
+        # "gray_image",
     ]
     + ["noise_uniform"] * 0,
     # "attribution_methods": ["lime"] + ["noise_uniform"] * 0,
@@ -63,6 +65,20 @@ params = {
     "package_size": 1,
     "irof_segments": 60,
     "irof_sigma": 4,
+}
+
+attribution_params = {
+    "lime_1": {"use_slic": True, "n_slic_segments": 10,},
+    "lime_2": {"use_slic": True, "n_slic_segments": 100,},
+    "lime_3": {"use_slic": False,},
+    "integrated_gradients": {"baseline": "random",},
+    "deeplift": {},
+    "gradientshap": {},
+    "saliency": {},
+    "occlusion": {},
+    "smoothgrad": {},
+    "guidedbackprop": {},
+    "gray_image": {},
 }
 
 
@@ -111,7 +127,12 @@ def main():
 
         # generate explanations
         attributions = generate_attributions(
-            image_batch[indices], label_batch[indices], model, params, device,
+            image_batch[indices],
+            label_batch[indices],
+            model,
+            params,
+            attribution_params,
+            device,
         )
 
         ###########################
@@ -267,8 +288,8 @@ def show_attr(attr_map, title, plot_loc):
     )
 
 
-def write_params_to_disk():
-    file_name = "params.json"
+def write_params_to_disk(params, name):
+    file_name = "{}.json".format(name)
     file_path = os.path.join(folder_path, file_name)
     with open(file_path, "w") as f:
         json.dump(params, f, indent=4)
@@ -288,5 +309,6 @@ def write_scores_to_file(scores):
 
 
 if __name__ == "__main__":
-    write_params_to_disk()
+    write_params_to_disk(params, "params")
+    write_params_to_disk(attribution_params, "attribution_params")
     main()

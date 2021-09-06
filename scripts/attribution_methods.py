@@ -1,14 +1,21 @@
+import numpy as np
 from captum.attr import *
 import torch
 from captum._utils.models.linear_model import SkLearnLinearRegression, SkLearnLasso
 from captum.attr._core.lime import get_exp_kernel_similarity_function
 from kornia.filters import gaussian_blur2d
+from skimage.segmentation import slic
+
+from skimage.segmentation import mark_boundaries
+import matplotlib.pyplot as plt
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def generate_attributions(image_batch, label_batch, model, params, device="cpu"):
+def generate_attributions(
+    image_batch, label_batch, model, params, attribution_params, device="cpu"
+):
 
     methods = params["attribution_methods"]
 
@@ -21,18 +28,20 @@ def generate_attributions(image_batch, label_batch, model, params, device="cpu")
     image_batch.requires_grad = True
 
     for i, m in enumerate(methods):
-        if m == "lime" or m == "gradientshap":
+        attr_args = attribution_params[m]
+        if "lime" in m or "gradientshap" in m:
             # TODO if doing in batches then gradientshap doesn't use one label per sample
-            method = attribution_method(m, model)
+            method = attribution_method(m, model, **attr_args)
             attr = torch.empty(size=image_batch.shape).to(device)
             for idx, img in enumerate(image_batch):
-                foo = method(img, label_batch[idx])
-                attr[idx] = foo
+                attr[idx] = method(img, label_batch[idx])
         elif "integrated_gradients" in m:
-            method = attribution_method(m, model, device=device, color_dim=image_batch.shape[1])
+            method = attribution_method(
+                m, model, color_dim=image_batch.shape[1], **attr_args
+            )
             attr = method(image_batch, label_batch)
         else:
-            method = attribution_method(m, model)
+            method = attribution_method(m, model, **attr_args)
             attr = method(image_batch, label_batch)
         # sum over the color channels
         if len(attr.shape) > 3:
@@ -43,42 +52,38 @@ def generate_attributions(image_batch, label_batch, model, params, device="cpu")
 
 
 def attribution_method(name, model, **kwargs):
-    if "integrated_gradients" in name:
-        if "random" in name:
-            return integrated_gradients(model, "random", **kwargs)
-        if "blur" in name:
-            return integrated_gradients(model, "blur", **kwargs)
-        else:
-            return integrated_gradients(model, "black", **kwargs)
 
-    if name == "deeplift":
+    if "integrated_gradient" in name:
+        return integrated_gradients(model, **kwargs)
+
+    if "deeplift" in name:
         return deeplift(model, **kwargs)
 
-    if name == "saliency":
+    if "saliency" in name:
         return saliency(model, **kwargs)
 
-    if name == "occlusion":
+    if "occlusion" in name:
         return occlusion(model, **kwargs)
 
-    if name == "guidedbackprop":
+    if "guidedbackprop" in name:
         return guidedbackprop(model, **kwargs)
 
-    if name == "smoothgrad":
+    if "smoothgrad" in name:
         return smoothgrad(model, **kwargs)
 
-    if name == "lime":
+    if "lime" in name:
         return lime(model, **kwargs)
 
-    if name == "gradientshap":
+    if "gradientshap" in name:
         return gradientshap(model, **kwargs)
 
-    if name == "gray_image":
+    if "gray_image" in name:
         return gray_image(**kwargs)
 
-    if name == "noise_normal":
+    if "noise_normal" in name:
         return noise_normal(**kwargs)
 
-    if name == "noise_uniform":
+    if "noise_uniform" in name:
         return noise_uniform(**kwargs)
 
 
@@ -89,26 +94,32 @@ def attribute_image_features(model, name, input, label, **kwargs):
     return tensor_attributions
 
 
-def integrated_gradients(model, baseline, **kwargs):
-    device = kwargs.get("devicce", "cpu")
-    color_dim = kwargs.get("color_dim", None)
+def integrated_gradients(model, baseline, color_dim):
 
     if baseline == "blur":
+
         def f(x, y):
             x = gaussian_blur2d(x, (3, 3), (4, 4))
             return IntegratedGradients(model).attribute(x, target=y)
+
         return f
 
     else:
         if baseline == "black":
-            color = torch.Tensor([0]).float().expand((color_dim)).to(device)
+            color = torch.Tensor([0]).float().expand(color_dim).to(device)
         elif baseline == "random":
-            color = torch.rand((color_dim)).float().to(device)
+            color = torch.rand(color_dim).float().to(device)
+        else:
+            raise ValueError
 
         def f(x, y):
             baseline_color = color.reshape(1, -1, 1, 1)
-            baselines = baseline_color.expand(x.shape[0], x.shape[1], x.shape[2], x.shape[3])
-            return IntegratedGradients(model).attribute(x, target=y, baselines=baselines)
+            baselines = baseline_color.expand(
+                x.shape[0], x.shape[1], x.shape[2], x.shape[3]
+            )
+            return IntegratedGradients(model).attribute(
+                x, target=y, baselines=baselines
+            )
 
         return f
 
@@ -166,7 +177,7 @@ def noise_uniform(**kwargs):
     return f
 
 
-def lime(model):
+def lime(model, use_slic, n_slic_segments=100, n_samples=256, perturbations_per_eval=128):
 
     exp_eucl_distance = get_exp_kernel_similarity_function(
         "euclidean", kernel_width=1000
@@ -176,12 +187,38 @@ def lime(model):
         lime_attr = Lime(
             model, SkLearnLinearRegression(), similarity_func=exp_eucl_distance,
         )
-        return lime_attr.attribute(
-            x.unsqueeze(0),
-            target=y.unsqueeze(0),
-            n_samples=256,
-            perturbations_per_eval=128,
-        )
+
+        # segment the image into superpixels
+        if use_slic:
+            img = x.permute(1, 2, 0).cpu().detach()
+            seg = slic(
+                img.to(torch.double).numpy(),
+                n_segments=n_slic_segments,
+                multichannel=True,
+            )
+
+            # to check if correctly transposed
+            # print(img.shape)
+            # print(seg.shape)
+            # plt.imshow(mark_boundaries(img, seg))
+            # plt.show()
+            seg = torch.Tensor(seg).to(torch.long).to(device)
+
+            return lime_attr.attribute(
+                x.unsqueeze(0),
+                target=y.unsqueeze(0),
+                feature_mask=seg.unsqueeze(0),
+                n_samples=n_samples,
+                perturbations_per_eval=perturbations_per_eval,
+            )
+
+        else:
+            return lime_attr.attribute(
+                x.unsqueeze(0),
+                target=y.unsqueeze(0),
+                n_samples=n_samples,
+                perturbations_per_eval=perturbations_per_eval,
+            )
 
     return f
 
