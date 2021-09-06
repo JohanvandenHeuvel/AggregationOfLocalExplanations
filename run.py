@@ -38,11 +38,11 @@ params = {
     "batch_size": 10,
     "max_nr_batches": 1,
     "attribution_methods": [
-        # "gradientshap",
-        # "deeplift",
+        "gradientshap",
+        "deeplift",
         "lime_1",
         "lime_2",
-        "lime_3",
+        # "lime_3",
         # "saliency",
         # "occlusion",
         # "smoothgrad",
@@ -50,7 +50,6 @@ params = {
         # "gray_image",
     ]
     + ["noise_uniform"] * 0,
-    # "attribution_methods": ["lime"] + ["noise_uniform"] * 0,
     "ensemble_methods": [
         "mean",
         "variance",
@@ -58,7 +57,7 @@ params = {
         "flipped_rbm",
         "rbm_flip_detection",
     ],
-    "attribution_processing": "filtering",
+    "attribution_processing": "splitting",
     "normalization": "min_max",
     "scoring_methods": ["insert", "delete", "irof"],
     "scores_batch_size": 100,
@@ -146,8 +145,17 @@ def main():
         if (
             params["attribution_processing"] == "splitting"
         ):  # split attributions in negative and positive parts
-            # TODO
-            pass
+            negative_attributions = torch.min(
+                attributions, torch.Tensor([0]).to(device)
+            )
+            positive_attributions = torch.max(
+                attributions, torch.Tensor([0]).to(device)
+            )
+
+            attributions = torch.cat(
+                (positive_attributions, negative_attributions), dim=0
+            )
+            params["attribution_methods"] += ["neg_" + m for m in params["attribution_methods"]]
 
         # make sure it sums to 1
         attributions = normalize(params["normalization"], arr=attributions)
