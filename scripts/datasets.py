@@ -4,14 +4,16 @@ from torchvision import transforms
 from abc import abstractmethod, ABC
 import shap
 
+from torch_geometric.transforms import ToSLIC
 
-def get_dataset(name):
+
+def get_dataset(name, normalized=True, SLIC=False):
 
     if name == "mnist":
-        return MNIST().dataset
+        return MNIST(normalized).dataset
 
     if name == "cifar10":
-        return Cifar10().dataset
+        return Cifar10(normalized, SLIC).dataset
 
     if name == "small_imagenet":
         return SmallImagenet().dataset
@@ -69,18 +71,24 @@ class MNIST:
 
 
 class Cifar10:
-    def __init__(self, normalized=True):
+    def __init__(self, normalized=True, SLIC=False):
 
+        transform_list = [transforms.ToTensor()]
         if normalized:
+            transform_list.append(transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)))
+        if SLIC:
+            transform_list.append(ToSLIC(n_segments=75))
 
-            self.transform = transforms.Compose(
-                [
-                    transforms.ToTensor(),
-                    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-                ]
-            )
-        else:
-            self.transform = transforms.Compose([transforms.ToTensor()])
+        self.transform = transforms.Compose(transform_list)
+
+        # if normalized:
+        #     self.transform = transforms.Compose(
+        #         [
+        #             transforms.ToTensor(),
+        #         ]
+        #     )
+        # else:
+        #     self.transform = transforms.Compose([transforms.ToTensor()])
 
     @property
     def dataset(self):
@@ -90,6 +98,8 @@ class Cifar10:
         )
 
         return dataset
+
+
 
 
 class SmallImagenet:

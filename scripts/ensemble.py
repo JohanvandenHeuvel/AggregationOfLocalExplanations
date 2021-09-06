@@ -101,7 +101,7 @@ def variance_ens(attributions):
 def rbm_ens(attributions):
 
     # TODO use parameters
-    rbms = [BernoulliRBM(n_components=1, batch_size=10, learning_rate=0.01, n_iter=100)]
+    rbms = [BernoulliRBM(n_components=1, batch_size=10, learning_rate=0.01, n_iter=256)]
 
     A = attributions.clone()
 
