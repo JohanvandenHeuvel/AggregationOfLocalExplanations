@@ -40,19 +40,30 @@ def solve_flipping(rbm, rbm_flipped, baseline):
     barrier = int(pct_pixel_to_check/100 * nr_pixels)
 
     # Get most important pixel positions of baseline
-    compare_pixels = torch.argsort(baseline.reshape(-1, nr_pixels), dim=1)[:, -barrier:]
+    compare_pixels = torch.argsort(baseline.reshape(-1, nr_pixels), dim=1)
 
     # Sort rbm pixels by relevancy
     rbm_rank = torch.argsort(rbm.reshape(-1, nr_pixels), dim=1)
 
     # Compute how many of the top baseline pixels are
     # most relevant / least relevant pixels for the rbm using the percentage of pixels
-    rbm_best = calc_count_intersects(compare_pixels, rbm_rank[:, -barrier:])
-    rbm_worst = calc_count_intersects(compare_pixels, rbm_rank[:, :barrier])
+    rbm_best1 = calc_count_intersects(compare_pixels[:, -barrier:], rbm_rank[:, -barrier:])
+    rbm_worst1 = calc_count_intersects(compare_pixels[:, -barrier:], rbm_rank[:, :barrier])
 
-    # Replace the original rbm by the flipped version if worst scores outweight best scores
+    # Compute same for worst baseline pixels
+    rbm_worst2 = calc_count_intersects(compare_pixels[:, :barrier], rbm_rank[:, -barrier:])
+    rbm_best2 = calc_count_intersects(compare_pixels[:, :barrier], rbm_rank[:, :barrier])
+
+    # Decide to flip if worst scores outweight best scores
+    preference_score = (np.asarray(rbm_best1)
+                        + np.asarray(rbm_best2)
+                        - np.asarray(rbm_worst1)
+                        - np.asarray(rbm_worst2)
+                        )
+    replace_index = preference_score < 0
+
+    # Depending on above choice, replace by flipped version
     solved_rbm = rbm.clone()
-    replace_index = np.asarray(rbm_best) - np.asarray(rbm_worst) < 0
     solved_rbm[replace_index] = rbm_flipped[replace_index]
 
     return solved_rbm
