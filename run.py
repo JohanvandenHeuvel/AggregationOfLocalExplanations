@@ -35,19 +35,19 @@ params = {
     "model": "Resnet18_cifar10",
     # "model": "mnist_model",
     "dataset": "cifar10",
-    "batch_size": 5,
-    "max_nr_batches": 2,
+    "batch_size": 20,
+    "max_nr_batches": 1,
     "attribution_methods": [
         "gradientshap",
         "deeplift",
         "lime_1",
         "lime_2",
-        # "lime_3",
-        # "saliency",
-        # "occlusion",
-        # "smoothgrad",
-        # "guidedbackprop",
-        # "gray_image",
+        "lime_3",
+        "saliency",
+        "occlusion",
+        "smoothgrad",
+        "guidedbackprop",
+        "gray_image",
     ]
     + ["noise_uniform"] * 0,
     "ensemble_methods": [
@@ -104,10 +104,10 @@ def main():
         ]
     )
     metric = ScoringMetric(model, scores, params)
-
+    # iter = dataloader.__iter__()
     # TODO: Remove later
     # for i in tqdm(range(len(dataloader))):
-    #     (image_batch, label_batch) = next(dataloader.__iter__())
+    #     (image_batch, label_batch) = next(iter)
     for i, (image_batch, label_batch) in tqdm(enumerate(dataloader)):
 
         # put data on gpu if possible
@@ -138,39 +138,46 @@ def main():
         ###########################
         #  explanation processing #
         ###########################
-        # remove negative values in some way
-        if (
-            params["attribution_processing"] == "filtering"
-        ):  # set negative values to zero
-            attributions = torch.max(attributions, torch.Tensor([0]).to(device))
-            attr_methods = params["attribution_methods"]
-        elif (
-            params["attribution_processing"] == "splitting"
-        ):  # split attributions in negative and positive parts
-            negative_attributions = torch.min(
-                attributions, torch.Tensor([0]).to(device)
+        zero = torch.Tensor([0]).to(device)
+        if params["attribution_processing"] == "filtering":
+            # Set negative values to zero
+            attributions = torch.max(attributions, zero)
+
+            # Make sure we have values in range [0,1]
+            attributions = normalize(params["normalization"], arr=attributions)
+
+            ###########################
+            #        ensembles        #
+            ###########################
+
+            ensemble_attributions = generate_ensembles(
+                attributions, params["ensemble_methods"], device
             )
-            positive_attributions = torch.max(
-                attributions, torch.Tensor([0]).to(device)
+
+        elif params["attribution_processing"] == "splitting":
+            # Split attributions in negative and positive parts
+            pos_attr = torch.max(attributions, zero)
+            neg_attr = torch.min(attributions, zero)
+
+            # Make sure we have values in range [0,1]
+            pos_norm, neg_norm = normalize(
+                params["normalization"], arr=pos_attr, arr2=neg_attr
             )
-            attributions = torch.cat(
-                (positive_attributions, negative_attributions), dim=0
-            )
-            # add negated names for plotting
-            attr_methods = params["attribution_methods"] + ["neg_" + m for m in params["attribution_methods"]]
+
+            ###########################
+            #        ensembles        #
+            ###########################
+
+            pos_ens = generate_ensembles(pos_norm, params["ensemble_methods"], device)
+            neg_ens = generate_ensembles(neg_norm, params["ensemble_methods"], device)
+
+            # Combine negative and positive attributions again
+            ensemble_attributions = pos_ens - neg_ens
+
+            # Finally also normalize individual attributions
+            attributions = normalize(params["normalization"], arr=attributions)
         else:
             raise ValueError
-
-        # make sure it sums to 1
-        attributions = normalize(params["normalization"], arr=attributions)
-
-        ###########################
-        #        ensembles        #
-        ###########################
-
-        ensemble_attributions = generate_ensembles(
-            attributions, params["ensemble_methods"], device
-        )
 
         # make sure it sums to 1
         ensemble_attributions = normalize(
@@ -201,7 +208,7 @@ def main():
 
             # TODO don't plot noise attributions
             # one image for every attribution method
-            for j in range(len(attr_methods)):
+            for j in range(len(attributions)):
                 attribution_img = attributions[j][idx].cpu().detach().numpy()
                 images.append(attribution_img)
 
@@ -213,7 +220,7 @@ def main():
             my_plot(
                 images,
                 ["original"]
-                + attr_methods
+                + params["attribution_methods"]
                 + params["ensemble_methods"]
                 + ["flipped_rbm"],
                 save=False,

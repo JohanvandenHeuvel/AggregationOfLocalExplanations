@@ -18,7 +18,7 @@ def generate_ensembles(attributions, methods, device="cpu"):
             # TODO flip by 1- or 1/
             # add flipped rbm
             j = methods.index("rbm")
-            e[i] = 1 / e[j]
+            e[i] = 1 - e[j]
         elif m == "rbm_flip_detection":
             # Requires all three calculated before
             rbm_index = methods.index("rbm")
@@ -112,7 +112,7 @@ def variance_ens(attributions):
 def rbm_ens(attributions):
 
     # TODO use parameters
-    rbms = [BernoulliRBM(n_components=1, batch_size=10, learning_rate=0.01, n_iter=256)]
+    rbms = [BernoulliRBM(n_components=1, batch_size=28, learning_rate=0.0032, n_iter=190)]
 
     A = attributions.clone()
 
