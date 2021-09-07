@@ -35,8 +35,8 @@ params = {
     "model": "Resnet18_cifar10",
     # "model": "mnist_model",
     "dataset": "cifar10",
-    "batch_size": 10,
-    "max_nr_batches": 1,
+    "batch_size": 5,
+    "max_nr_batches": 2,
     "attribution_methods": [
         "gradientshap",
         "deeplift",
@@ -65,6 +65,7 @@ params = {
     "irof_segments": 60,
     "irof_sigma": 4,
 }
+
 
 attribution_params = {
     "lime_1": {"use_slic": True, "n_slic_segments": 10,},
@@ -142,7 +143,8 @@ def main():
             params["attribution_processing"] == "filtering"
         ):  # set negative values to zero
             attributions = torch.max(attributions, torch.Tensor([0]).to(device))
-        if (
+            attr_methods = params["attribution_methods"]
+        elif (
             params["attribution_processing"] == "splitting"
         ):  # split attributions in negative and positive parts
             negative_attributions = torch.min(
@@ -151,11 +153,13 @@ def main():
             positive_attributions = torch.max(
                 attributions, torch.Tensor([0]).to(device)
             )
-
             attributions = torch.cat(
                 (positive_attributions, negative_attributions), dim=0
             )
-            params["attribution_methods"] += ["neg_" + m for m in params["attribution_methods"]]
+            # add negated names for plotting
+            attr_methods = params["attribution_methods"] + ["neg_" + m for m in params["attribution_methods"]]
+        else:
+            raise ValueError
 
         # make sure it sums to 1
         attributions = normalize(params["normalization"], arr=attributions)
@@ -197,7 +201,7 @@ def main():
 
             # TODO don't plot noise attributions
             # one image for every attribution method
-            for j in range(len(params["attribution_methods"])):
+            for j in range(len(attr_methods)):
                 attribution_img = attributions[j][idx].cpu().detach().numpy()
                 images.append(attribution_img)
 
@@ -209,7 +213,7 @@ def main():
             my_plot(
                 images,
                 ["original"]
-                + params["attribution_methods"]
+                + attr_methods
                 + params["ensemble_methods"]
                 + ["flipped_rbm"],
                 save=False,
@@ -221,7 +225,6 @@ def main():
             pd.options.display.width = 0
             print(score_table)
             return
-
 
 def create_score_table(scores):
     # For each method add mean and std column
