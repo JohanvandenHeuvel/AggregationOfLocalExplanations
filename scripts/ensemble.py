@@ -127,6 +127,7 @@ def rbm_ens(attributions):
     result = torch.empty(size=size)
     for i, a in enumerate(A):
 
+        a = np.nan_to_num(a)
         a = a.T
 
         for r in rbms:

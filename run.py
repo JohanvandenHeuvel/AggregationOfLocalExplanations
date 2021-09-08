@@ -16,6 +16,9 @@ from scripts.ensemble import generate_ensembles
 from models.predict import predict_label
 from scripts.scoring_metric import ScoringMetric
 
+import warnings
+warnings.filterwarnings('ignore')
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 torch.cuda.empty_cache()
 
@@ -33,19 +36,16 @@ os.makedirs(folder_path)
 ###########################
 params = {
     "model": "Resnet18_cifar10",
-    # "model": "mnist_model",
     "dataset": "cifar10",
     "batch_size": 20,
-    "max_nr_batches": 1,
+    # "max_nr_batches": 1,
     "attribution_methods": [
         "gradientshap",
         "deeplift",
-        "lime_1",
-        "lime_2",
-        "lime_3",
+        "lime",
         "saliency",
-        "occlusion",
         "smoothgrad",
+        "integrated_gradients",
         "guidedbackprop",
         "gray_image",
     ]
@@ -57,7 +57,7 @@ params = {
         "flipped_rbm",
         "rbm_flip_detection",
     ],
-    "attribution_processing": "splitting",
+    "attribution_processing": "filtering",
     "normalization": "min_max",
     "scoring_methods": ["insert", "delete", "irof"],
     "scores_batch_size": 100,
@@ -68,10 +68,8 @@ params = {
 
 
 attribution_params = {
-    "lime_1": {"use_slic": True, "n_slic_segments": 10,},
-    "lime_2": {"use_slic": True, "n_slic_segments": 100,},
-    "lime_3": {"use_slic": False,},
-    "integrated_gradients": {"baseline": "random",},
+    "lime": {"use_slic": True, "n_slic_segments": 100,},
+    "integrated_gradients": {"baseline": "black",},
     "deeplift": {},
     "gradientshap": {},
     "saliency": {},
@@ -195,43 +193,41 @@ def main():
             ensemble_attributions,
         )
 
-        # TODO: Uncommented, maybe put into a separate function
-        ###########################
-        #      plot examples      #
-        ###########################
-        for idx in range(len(indices)):
-            # idx = 0  # first image of the batch
-            original_img = (
-                torch.mean(image_batch[indices], dim=1)[idx].cpu().detach().numpy()
-            )
-            images = [original_img]
+        # # TODO: Uncommented, maybe put into a separate function
+        # ###########################
+        # #      plot examples      #
+        # ###########################
+        # for idx in range(len(indices)):
+        #     # idx = 0  # first image of the batch
+        #     original_img = (
+        #         torch.mean(image_batch[indices], dim=1)[idx].cpu().detach().numpy()
+        #     )
+        #     images = [original_img]
+        #
+        #     # TODO don't plot noise attributions
+        #     # one image for every attribution method
+        #     for j in range(len(attributions)):
+        #         attribution_img = attributions[j][idx].cpu().detach().numpy()
+        #         images.append(attribution_img)
+        #
+        #     # one image for every ensemble method
+        #     for j in range(len(params["ensemble_methods"])):
+        #         ensemble_img = ensemble_attributions[j][idx].cpu().detach().numpy()
+        #         images.append(ensemble_img)
+        #
+        #     my_plot(
+        #         images,
+        #         ["original"]
+        #         + params["attribution_methods"]
+        #         + params["ensemble_methods"]
+        #         + ["flipped_rbm"],
+        #         save=False,
+        #     )
 
-            # TODO don't plot noise attributions
-            # one image for every attribution method
-            for j in range(len(attributions)):
-                attribution_img = attributions[j][idx].cpu().detach().numpy()
-                images.append(attribution_img)
-
-            # one image for every ensemble method
-            for j in range(len(params["ensemble_methods"])):
-                ensemble_img = ensemble_attributions[j][idx].cpu().detach().numpy()
-                images.append(ensemble_img)
-
-            my_plot(
-                images,
-                ["original"]
-                + params["attribution_methods"]
-                + params["ensemble_methods"]
-                + ["flipped_rbm"],
-                save=False,
-            )
-
-        if i + 1 >= params["max_nr_batches"]:
-            write_scores_to_file(scores)
-            score_table = create_score_table(scores)
-            pd.options.display.width = 0
-            print(score_table)
-            return
+    write_scores_to_file(scores)
+    score_table = create_score_table(scores)
+    pd.options.display.width = 0
+    print(score_table)
 
 def create_score_table(scores):
     # For each method add mean and std column
