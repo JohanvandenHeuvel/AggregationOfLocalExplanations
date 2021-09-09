@@ -13,11 +13,12 @@ def normalize(method, **kwargs):
 
 def min_max(arr, arr2=None):
     if arr2 is None:
-        # Do min-max normaliza
+        # Do min-max normalization for just one array
         A = [arr.clone()]
     else:
-        # Do min max normaliza
-        # The difference later
+        # Do min max normalization for both arrays
+        # The difference later is the division by max distance
+        # of the two arrays
         A = [arr.clone(), arr2.clone()]
 
     A = torch.stack(A)

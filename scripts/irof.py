@@ -15,13 +15,10 @@ class IrofDataset(PixelManipulationBase):
         self._irof_segments = irof_segments
         self._irof_sigma = irof_sigma
 
-        self._max_seg_pixels = None
-
         self.generate_pixel_batches()
         self.generate_initial_image()
 
-        gauss_sum = int(self._batch_size * (self._batch_size + 1) / 2)
-        self.generate_temp_baseline(gauss_sum * self._max_seg_pixels)
+        self.generate_temp_baseline()
 
     def generate_pixel_batches(self):
         # Apply Slic algorithm to get superpixel areas
@@ -54,10 +51,6 @@ class IrofDataset(PixelManipulationBase):
             self._pixel_batches, self._batch_size, torch.Tensor([0]).to(device=self._device)
         )
 
-        # Save the statistics for generate_temp_baseline
-        seg_count = [len(attr[segments == seg]) for seg in range(nr_segments)]
-        self._max_seg_pixels = np.max(seg_count)
-
     @staticmethod
     def _add_to_hierarhical_list(list_element, target_size, item):
         if len(list_element[-1]) == target_size:
@@ -68,36 +61,24 @@ class IrofDataset(PixelManipulationBase):
         batch_size = self._get_batch_size(index)
 
         # Get all pixels
-        all_pixels = torch.cat(self._pixel_batches[index])
+        all_pixels = torch.cat(self._pixel_batches[index]).to(self._device).long()
 
         # Create a matrix of indices of size [batch_size, all_pixels]
         template_indices = all_pixels.view(1, -1).repeat(batch_size, 1)
-        # Shift each batch by total amount of pixels of previous image
-        batch_indices = self._index_shift(
-            template_indices.long(), self.width * self.height
-        )
 
-        # For each package only keep the previous pixels and package_size additional pixels
-        lengths = torch.LongTensor(
+        # For each package only keep the previous pixels and package size additional pixels
+        pixel_per_image = torch.LongTensor(
             [len(package) for package in self._pixel_batches[index]]
         ).to(self._device)
-        cumsum = torch.cumsum(lengths, dim=0)
-        keep_index_template = torch.cat([torch.arange(0, s.item()) for s in cumsum]).to(
-            self._device
-        )
+        cumsum = torch.cumsum(pixel_per_image, dim=0)
+        keep_index_template = torch.cat(
+            [torch.arange(0, s.item()) for s in cumsum]
+        ).to(self._device)
+
         template_indices = template_indices.reshape(-1)[keep_index_template]
         template_indices = self._color_channel_shift(template_indices)
 
-        # Do the same for the batches
-        nr_pixel_in_group = len(all_pixels)
-        keep_index_batch = torch.cat(
-            [
-                torch.arange(0, s.item()) + i * nr_pixel_in_group
-                for i, s in enumerate(cumsum)
-            ]
-        )
-        batch_indices = batch_indices.reshape(-1)[keep_index_batch]
-        batch_indices = self._color_channel_shift(batch_indices)
+        batch_indices = self._batch_shift(template_indices, pixel_per_image)
 
         return template_indices, batch_indices
 

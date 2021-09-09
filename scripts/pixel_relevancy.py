@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 
 from scripts.pixel_manipulation import PixelManipulationBase
 
@@ -14,8 +15,7 @@ class PixelRelevancyDataset(PixelManipulationBase):
         self.generate_pixel_batches()
         self.generate_initial_image()
 
-        gauss_sum = int(self._batch_size * (self._batch_size + 1) / 2)
-        self.generate_temp_baseline(gauss_sum * self._package_size)
+        self.generate_temp_baseline()
 
     def generate_pixel_batches(self):
         # For simplicity: Ensure that all packages have the same size.
@@ -41,10 +41,6 @@ class PixelRelevancyDataset(PixelManipulationBase):
 
         # Create a matrix of indices of size [batch_size, package_size * batch_size]
         template_indices = self._pixel_batches[index].view(1, -1).repeat(batch_size, 1)
-        # Shift each batch by total amount of pixels of previous image
-        batch_indices = self._index_shift(
-            template_indices.long(), self.width * self.height
-        )
 
         # For each package only keep the previous pixels and package_size additional pixels
         keep_index_template = torch.cat(
@@ -53,16 +49,9 @@ class PixelRelevancyDataset(PixelManipulationBase):
         template_indices = template_indices.reshape(-1)[keep_index_template]
         template_indices = self._color_channel_shift(template_indices)
 
-        # Do the same for the batches
-        nr_pixel_in_group = self._package_size * batch_size
-        keep_index_batch = torch.cat(
-            [
-                torch.arange(0, self._package_size * i) + (i - 1) * nr_pixel_in_group
-                for i in range(1, batch_size + 1)
-            ]
-        )
-        batch_indices = batch_indices.reshape(-1)[keep_index_batch]
-        batch_indices = self._color_channel_shift(batch_indices)
+        # Shift each batch item by all the pixels of previous images
+        pixel_per_image = torch.Tensor(batch_size * [self._package_size]).to(self._device).long()
+        batch_indices = self._batch_shift(template_indices, pixel_per_image)
 
         return template_indices, batch_indices
 

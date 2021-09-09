@@ -36,16 +36,15 @@ class PixelManipulationBase(Dataset):
             self._temp_image = (
                 self._baseline.view(self.color_channels, 1)
                 .repeat(1, self.width * self.height)
-                .flatten()
             )
         else:
             self._temp_image = self._image
-        self._temp_image = self._temp_image.reshape(-1)
+        self._temp_image = self._temp_image.flatten()
 
-    def generate_temp_baseline(self, count):
+    def generate_temp_baseline(self):
         # Keep baseline image multiply times to avoid repeat the generation every iteration
         self._temp_baseline = (
-            self._baseline.view(self.color_channels, 1).repeat(1, count).reshape(-1)
+            self._baseline.view(self.color_channels, 1).repeat(1, self.nr_pixels).flatten()
         )
 
     def __len__(self):
@@ -76,10 +75,36 @@ class PixelManipulationBase(Dataset):
     def _gen_indices(self, index):
         return
 
+    @property
+    def nr_pixels(self):
+        return self.width * self.height
+
     def _color_channel_shift(self, indices):
-        return torch.cat(
-            [indices * self.color_channels + i for i in range(self.color_channels)]
-        )
+        # For every color channel shift by nr_pixels
+        return torch.stack(
+            [indices + i*self.nr_pixels for i in range(self.color_channels)]
+        ).to(self._device).T.flatten()
+
+    def _batch_shift(self, indices, pixel_per_image):
+        # Depending on pixel_per_image create an array of the following form:
+        # [0 0 1 1 1 2 2 2 2 2 2]
+        # How often a number is repeated depends on pixel_per_image
+        nr_pixels_cum = torch.cumsum(pixel_per_image, 0)
+        image_indices = [torch.Tensor(nr_pixels_cum[i]*[i]) for i in range(len(nr_pixels_cum))]
+        image_indices = torch.cat(image_indices).to(self._device).long()
+
+        # Multiply it with the total number of data points per image
+        image_indices_shift = image_indices * self.color_channels * self.nr_pixels
+
+        # Expand the shift for each color channel
+        nr_man_pixels = int(len(indices) / self.color_channels)
+        image_indices_shift = image_indices_shift.reshape(-1, 1).expand(nr_man_pixels, self.color_channels)
+        image_indices_shift = image_indices_shift.flatten()
+
+        # Shift the original indices
+        batch_indices = indices + image_indices_shift
+
+        return batch_indices
 
     @abc.abstractmethod
     def _get_fake_image_size(self):
@@ -114,7 +139,7 @@ class PixelManipulationBase(Dataset):
         if self._insert:
             image_batch[batch_indices] = self._image.flatten()[template_indices]
         else:
-            image_batch[batch_indices] = self._temp_baseline[0 : len(template_indices)]
+            image_batch[batch_indices] = self._temp_baseline[template_indices]
 
         # Reshape the image to proper sizes as required by the network
         image_batch = image_batch.reshape(
@@ -126,6 +151,6 @@ class PixelManipulationBase(Dataset):
             image_batch[batch_size - 1] = self._image
         else:
             # Save last image for the next run
-            self._temp_image = image_batch[batch_size - 1]
+            self._temp_image = image_batch[-1]
 
         return image_batch

@@ -6,6 +6,7 @@ from sklearn.metrics import auc
 from models.predict import calculate_probs
 from scripts.irof import IrofDataset
 from scripts.pixel_relevancy import PixelRelevancyDataset
+from scripts.causual_metric import CausalMetric
 
 
 class ScoringMetric:
@@ -30,7 +31,7 @@ class ScoringMetric:
                     scoring_dataset = self._make_scoring_dataset(
                         scoring_method, image, attr
                     )
-                    score, _ = self._calc_score(scoring_dataset, label)
+                    score, _ = self._calc_score(scoring_method, scoring_dataset, label)
                     self._scores[scoring_method][title].append(score)
 
     def _make_scoring_dataset(self, scoring_method, image, attr):
@@ -57,7 +58,7 @@ class ScoringMetric:
 
         return dataset
 
-    def _calc_score(self, scoring_dataset, label):
+    def _calc_score(self, scoring_method, scoring_dataset, label):
 
         probs = []
         for j, img_batch in enumerate(scoring_dataset):
@@ -69,12 +70,9 @@ class ScoringMetric:
         x = np.arange(0, len(rel_probs))
         y = rel_probs.detach().cpu().numpy()
 
+        if scoring_method == "irof":
+            y = 1-y
+
         score = auc(x, y) / len(rel_probs)
 
         return score, y
-
-
-
-
-
-
