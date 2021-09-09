@@ -112,9 +112,8 @@ def main():
         image_batch = image_batch.to(device)
         label_batch = label_batch.to(device)
 
-        # TODO remove (small imagenet does not have it's own labels)
-        if params["dataset"] == "small_imagenet":
-            label_batch = predict_label(model, image_batch).squeeze()
+        # we use the predicted labels as targets
+        label_batch = predict_label(model, image_batch).squeeze()
 
         # for what label the image should be explained for
         predicted_labels = predict_label(model, image_batch).squeeze()
