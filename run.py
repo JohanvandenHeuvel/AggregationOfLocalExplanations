@@ -17,7 +17,8 @@ from models.predict import predict_label
 from scripts.scoring_metric import ScoringMetric
 
 import warnings
-warnings.filterwarnings('ignore')
+
+warnings.filterwarnings("ignore")
 
 device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
 torch.cuda.empty_cache()
@@ -38,7 +39,7 @@ params = {
     "model": "Resnet18_cifar10",
     "dataset": "cifar10",
     "batch_size": 20,
-    # "max_nr_batches": 1,
+    "max_nr_batches": 100,  # -1 for no early stopping
     "attribution_methods": [
         "gradientshap",
         "deeplift",
@@ -66,7 +67,6 @@ params = {
     "irof_sigma": 4,
 }
 
-
 attribution_params = {
     "lime": {"use_slic": True, "n_slic_segments": 100,},
     "integrated_gradients": {"baseline": "black",},
@@ -90,7 +90,7 @@ def main():
     # dataset and which images to explain the classification for
     dataset = datasets.get_dataset(params["dataset"])
     dataloader = torch.utils.data.DataLoader(
-        dataset, batch_size=params["batch_size"], shuffle=False, num_workers=2
+        dataset, batch_size=params["batch_size"], shuffle=True, num_workers=2
     )
 
     # Preparation for score computation later
@@ -223,6 +223,9 @@ def main():
         #         save=False,
         #     )
 
+        if i > params["max_nr_batches"] > 0:
+            print("stopped early")
+            break
 
     write_scores_to_file(scores)
     score_table = create_score_table(scores)
@@ -230,6 +233,7 @@ def main():
     print(score_table)
     score_table_path = os.path.join(folder_path, "score_table.csv")
     score_table.to_csv(score_table_path)
+
 
 def create_score_table(scores):
     # For each method add mean and std column

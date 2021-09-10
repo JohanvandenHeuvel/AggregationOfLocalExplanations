@@ -46,7 +46,9 @@ class Cifar10:
 
         transform_list = [transforms.ToTensor()]
         if normalized:
-            transform_list.append(transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)))
+            transform_list.append(
+                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+            )
         if SLIC:
             transform_list.append(ToSLIC(n_segments=75))
 
@@ -69,8 +71,6 @@ class Cifar10:
         )
 
         return dataset
-
-
 
 
 class SmallImagenet:
