@@ -10,7 +10,7 @@ from skimage.segmentation import mark_boundaries
 import matplotlib.pyplot as plt
 
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
 
 
 def generate_attributions(

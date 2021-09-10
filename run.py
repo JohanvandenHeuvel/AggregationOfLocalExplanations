@@ -19,7 +19,7 @@ from scripts.scoring_metric import ScoringMetric
 import warnings
 warnings.filterwarnings('ignore')
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
 torch.cuda.empty_cache()
 
 ###########################
@@ -223,10 +223,13 @@ def main():
         #         save=False,
         #     )
 
+
     write_scores_to_file(scores)
     score_table = create_score_table(scores)
     pd.options.display.width = 0
     print(score_table)
+    score_table_path = os.path.join(folder_path, "score_table.csv")
+    score_table.to_csv(score_table_path)
 
 def create_score_table(scores):
     # For each method add mean and std column

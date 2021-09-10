@@ -3,9 +3,9 @@ import torch.nn.functional as F
 
 
 def calculate_probs(model, images):
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
-        torch.cuda.reset_peak_memory_stats()
+    #if torch.cuda.is_available():
+        #torch.cuda.empty_cache()
+        #torch.cuda.reset_peak_memory_stats()
     images.requires_grad = False
     model.eval()
 

@@ -6,7 +6,6 @@ from sklearn.metrics import auc
 from models.predict import calculate_probs
 from scripts.irof import IrofDataset
 from scripts.pixel_relevancy import PixelRelevancyDataset
-from scripts.causual_metric import CausalMetric
 
 
 class ScoringMetric:
