@@ -7,25 +7,28 @@ from sklearn.neural_network import BernoulliRBM
 import matplotlib.pyplot as plt
 
 
-def generate_ensembles(attributions, methods, device="cpu"):
+def generate_ensembles(attributions, methods, rbm_params, device="cpu"):
     size = [len(methods)] + list(attributions.shape)[1:]
     e = torch.empty(size=size).to(device)
 
     for i, m in enumerate(methods):
 
-        # TOOO temporary solution
-        if m == "flipped_rbm":
-            # TODO flip by 1- or 1/
-            # add flipped rbm
-            j = methods.index("rbm")
-            e[i] = 1 - e[j]
-        elif m == "rbm_flip_detection":
-            # Requires all three calculated before
-            rbm_index = methods.index("rbm")
-            flipped_index = methods.index("flipped_rbm")
-            baseline_index = methods.index("mean")
-
-            e[i] = solve_flipping(e[rbm_index], e[flipped_index], e[baseline_index])
+        if "rbm" in m:
+            # TOOO temporary solution
+            if m == "flipped_rbm":
+                # TODO flip by 1- or 1/
+                # add flipped rbm
+                j = methods.index("rbm")
+                e[i] = 1 - e[j]
+            elif m == "rbm_flip_detection":
+                # Requires all three calculated before
+                rbm_index = methods.index("rbm")
+                flipped_index = methods.index("flipped_rbm")
+                baseline_index = methods.index("mean")
+                e[i] = solve_flipping(e[rbm_index], e[flipped_index], e[baseline_index])
+            else:
+                ens = ensemble(m, attributions=attributions, param=rbm_params)
+                e[i] = ens
         else:
             ens = ensemble(m, attributions=attributions)
             e[i] = ens
@@ -37,7 +40,7 @@ def solve_flipping(rbm, rbm_flipped, baseline):
     # Define percentage of top baseline pixels that are compared
     pct_pixel_to_check = 5
     nr_pixels = rbm.shape[1] * rbm.shape[2]
-    barrier = int(pct_pixel_to_check/100 * nr_pixels)
+    barrier = int(pct_pixel_to_check / 100 * nr_pixels)
 
     # Get most important pixel positions of baseline
     compare_pixels = torch.argsort(baseline.reshape(-1, nr_pixels), dim=1)
@@ -47,19 +50,28 @@ def solve_flipping(rbm, rbm_flipped, baseline):
 
     # Compute how many of the top baseline pixels are
     # most relevant / least relevant pixels for the rbm using the percentage of pixels
-    rbm_best1 = calc_count_intersects(compare_pixels[:, -barrier:], rbm_rank[:, -barrier:])
-    rbm_worst1 = calc_count_intersects(compare_pixels[:, -barrier:], rbm_rank[:, :barrier])
+    rbm_best1 = calc_count_intersects(
+        compare_pixels[:, -barrier:], rbm_rank[:, -barrier:]
+    )
+    rbm_worst1 = calc_count_intersects(
+        compare_pixels[:, -barrier:], rbm_rank[:, :barrier]
+    )
 
     # Compute same for worst baseline pixels
-    rbm_worst2 = calc_count_intersects(compare_pixels[:, :barrier], rbm_rank[:, -barrier:])
-    rbm_best2 = calc_count_intersects(compare_pixels[:, :barrier], rbm_rank[:, :barrier])
+    rbm_worst2 = calc_count_intersects(
+        compare_pixels[:, :barrier], rbm_rank[:, -barrier:]
+    )
+    rbm_best2 = calc_count_intersects(
+        compare_pixels[:, :barrier], rbm_rank[:, :barrier]
+    )
 
     # Decide to flip if worst scores outweight best scores
-    preference_score = (np.asarray(rbm_best1)
-                        + np.asarray(rbm_best2)
-                        - np.asarray(rbm_worst1)
-                        - np.asarray(rbm_worst2)
-                        )
+    preference_score = (
+        np.asarray(rbm_best1)
+        + np.asarray(rbm_best2)
+        - np.asarray(rbm_worst1)
+        - np.asarray(rbm_worst2)
+    )
     replace_index = preference_score < 0
 
     # Depending on above choice, replace by flipped version
@@ -81,7 +93,7 @@ def calc_count_intersects(t1, t2):
     c = [combined[i].unique(return_counts=True)[1] for i in range(combined.shape[0])]
 
     # Count the duplicates
-    count_intersect = [torch.sum(c[i]>1).item() for i in range(len(c))]
+    count_intersect = [torch.sum(c[i] > 1).item() for i in range(len(c))]
 
     return count_intersect
 
@@ -109,10 +121,17 @@ def variance_ens(attributions):
     return torch.mean(attributions, dim=0) / (torch.std(attributions, dim=0) + epsilon)
 
 
-def rbm_ens(attributions):
+def rbm_ens(attributions, param):
 
     # TODO use parameters
-    rbms = [BernoulliRBM(n_components=1, batch_size=28, learning_rate=0.0032, n_iter=190)]
+    rbms = [
+        BernoulliRBM(
+            n_components=1,
+            batch_size=param["batch_size"],
+            learning_rate=param["learning_rate"],
+            n_iter=param["n_iter"],
+        )
+    ]
 
     A = attributions.clone()
 

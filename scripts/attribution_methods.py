@@ -6,11 +6,12 @@ from captum.attr._core.lime import get_exp_kernel_similarity_function
 from kornia.filters import gaussian_blur2d
 from skimage.segmentation import slic
 
+
 from skimage.segmentation import mark_boundaries
 import matplotlib.pyplot as plt
 
 
-device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 def generate_attributions(

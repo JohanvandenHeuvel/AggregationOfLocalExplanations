@@ -255,7 +255,6 @@ Thumbs.db
 /experiment1/data
 /experiment2/data
 /experiment3/data
-/results
 *.vscode/
 
 # End of https://www.toptal.com/developers/gitignore/api/python,pycharm

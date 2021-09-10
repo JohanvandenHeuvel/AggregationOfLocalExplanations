@@ -20,17 +20,9 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
-device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 torch.cuda.empty_cache()
 
-###########################
-#  for writing to disk    #
-###########################
-results_dir = "results"
-now = datetime.datetime.now()
-folder_name = now.strftime("%m-%d_@%H-%M-%S")
-folder_path = os.path.join(results_dir, folder_name)
-os.makedirs(folder_path)
 
 ###########################
 #  experiment conditions  #
@@ -38,8 +30,8 @@ os.makedirs(folder_path)
 params = {
     "model": "Resnet18_cifar10",
     "dataset": "cifar10",
-    "batch_size": 20,
-    "max_nr_batches": 100,  # -1 for no early stopping
+    "batch_size": 10,
+    "max_nr_batches": 1,  # -1 for no early stopping
     "attribution_methods": [
         "gradientshap",
         "deeplift",
@@ -77,6 +69,12 @@ attribution_params = {
     "smoothgrad": {},
     "guidedbackprop": {},
     "gray_image": {},
+}
+
+rbm_params = {
+    "batch_size": 28,
+    "learning_rate": 0.001,
+    "n_iter": 100,
 }
 
 
@@ -148,7 +146,7 @@ def main():
             ###########################
 
             ensemble_attributions = generate_ensembles(
-                attributions, params["ensemble_methods"], device
+                attributions, params["ensemble_methods"], rbm_params, device
             )
 
         elif params["attribution_processing"] == "splitting":
@@ -223,7 +221,9 @@ def main():
         #         save=False,
         #     )
 
-        if i > params["max_nr_batches"] > 0:
+        print(i, params['max_nr_batches'])
+
+        if i+1 >= params["max_nr_batches"] > 0:
             print("stopped early")
             break
 
@@ -329,6 +329,22 @@ def write_scores_to_file(scores):
 
 
 if __name__ == "__main__":
-    write_params_to_disk(params, "params")
-    write_params_to_disk(attribution_params, "attribution_params")
-    main()
+
+    ###########################
+    #  for writing to disk    #
+    ###########################
+    results_dir = "results"
+
+    for x in [0.0001, 0.001, 0.01]:
+        now = datetime.datetime.now()
+        folder_name = now.strftime("%m-%d_@%H-%M-%S")
+        folder_path = os.path.join(results_dir, folder_name)
+        os.makedirs(folder_path)
+
+        rbm_params["learning_rate"] = x
+
+        write_params_to_disk(params, "params")
+        write_params_to_disk(attribution_params, "attribution_params")
+        write_params_to_disk(rbm_params, "rbm_params")
+
+        main()
