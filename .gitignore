@@ -265,6 +265,7 @@ Thumbs.db
 *.idea/
 *.pt
 data/
+.png
 
 /VOC/
 /Image_and_Text_Classification_LIME.ipynb
