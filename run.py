@@ -33,14 +33,9 @@ params = {
     "batch_size": 40,
     "max_nr_batches": 50,  # -1 for no early stopping
     "attribution_methods": [
-        "gradientshap",
-        "deeplift",
-        "lime",
-        "saliency",
-        "smoothgrad",
-        "integrated_gradients",
-        "guidedbackprop",
-        "gray_image",
+        "lime_1",
+        "lime_2",
+        "lime_3",
     ]
     + ["noise_uniform"] * 0,
     "ensemble_methods": [
@@ -50,7 +45,7 @@ params = {
         "flipped_rbm",
         "rbm_flip_detection",
     ],
-    "attribution_processing": "none",
+    "attribution_processing": "filtering",
     "normalization": "min_max",
     "scoring_methods": ["insert", "delete", "irof"],
     "scores_batch_size": 100,
@@ -60,7 +55,9 @@ params = {
 }
 
 attribution_params = {
-    "lime": {"use_slic": True, "n_slic_segments": 100,},
+    "lime_1": {"use_slic": True, "n_slic_segments": 10,},
+    "lime_2": {"use_slic": True, "n_slic_segments": 100,},
+    "lime_3": {"use_slic": True, "n_slic_segments": 1000,},
     "integrated_gradients": {"baseline": "black",},
     "deeplift": {},
     "gradientshap": {},

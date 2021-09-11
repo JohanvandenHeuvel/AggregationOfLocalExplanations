@@ -1,0 +1,24 @@
+{
+    "lime_1": {
+        "use_slic": true,
+        "n_slic_segments": 10
+    },
+    "lime_2": {
+        "use_slic": true,
+        "n_slic_segments": 100
+    },
+    "lime_3": {
+        "use_slic": true,
+        "n_slic_segments": 1000
+    },
+    "integrated_gradients": {
+        "baseline": "black"
+    },
+    "deeplift": {},
+    "gradientshap": {},
+    "saliency": {},
+    "occlusion": {},
+    "smoothgrad": {},
+    "guidedbackprop": {},
+    "gray_image": {}
+}
