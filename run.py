@@ -30,8 +30,8 @@ torch.cuda.empty_cache()
 params = {
     "model": "Resnet18_cifar10",
     "dataset": "cifar10",
-    "batch_size": 10,
-    "max_nr_batches": 1,  # -1 for no early stopping
+    "batch_size": 40,
+    "max_nr_batches": 50,  # -1 for no early stopping
     "attribution_methods": [
         "gradientshap",
         "deeplift",
@@ -50,7 +50,7 @@ params = {
         "flipped_rbm",
         "rbm_flip_detection",
     ],
-    "attribution_processing": "filtering",
+    "attribution_processing": "none",
     "normalization": "min_max",
     "scoring_methods": ["insert", "delete", "irof"],
     "scores_batch_size": 100,
@@ -171,6 +171,17 @@ def main():
 
             # Finally also normalize individual attributions
             attributions = normalize(params["normalization"], arr=attributions)
+        elif params['attribution_processing'] == 'none':
+            # Make sure we have values in range [0,1]
+            attributions = normalize(params["normalization"], arr=attributions)
+
+            ###########################
+            #        ensembles        #
+            ###########################
+
+            ensemble_attributions = generate_ensembles(
+                attributions, params["ensemble_methods"], rbm_params, device
+            )
         else:
             raise ValueError
 
