@@ -346,16 +346,13 @@ if __name__ == "__main__":
     ###########################
     results_dir = "results"
 
-    for x in [0.0001, 0.001, 0.01]:
-        now = datetime.datetime.now()
-        folder_name = now.strftime("%m-%d_@%H-%M-%S")
-        folder_path = os.path.join(results_dir, folder_name)
-        os.makedirs(folder_path)
+    now = datetime.datetime.now()
+    folder_name = now.strftime("%m-%d_@%H-%M-%S")
+    folder_path = os.path.join(results_dir, folder_name)
+    os.makedirs(folder_path)
 
-        rbm_params["learning_rate"] = x
+    write_params_to_disk(params, "params")
+    write_params_to_disk(attribution_params, "attribution_params")
+    write_params_to_disk(rbm_params, "rbm_params")
 
-        write_params_to_disk(params, "params")
-        write_params_to_disk(attribution_params, "attribution_params")
-        write_params_to_disk(rbm_params, "rbm_params")
-
-        main()
+    main()
