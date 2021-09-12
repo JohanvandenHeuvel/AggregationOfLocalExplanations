@@ -1,8 +1,11 @@
 import torchvision
 import torch
 from torchvision import transforms
+from torch.utils.data import Dataset
 from abc import abstractmethod, ABC
 import shap
+import glob, os
+from PIL import Image
 
 from torch_geometric.transforms import ToSLIC
 
@@ -17,6 +20,9 @@ def get_dataset(name, normalized=True, SLIC=False):
 
     if name == "small_imagenet":
         return SmallImagenet().dataset
+
+    if name == "imagenet":
+        return ImageNet().dataset
 
     raise ValueError
 
@@ -54,14 +60,6 @@ class Cifar10:
 
         self.transform = transforms.Compose(transform_list)
 
-        # if normalized:
-        #     self.transform = transforms.Compose(
-        #         [
-        #             transforms.ToTensor(),
-        #         ]
-        #     )
-        # else:
-        #     self.transform = transforms.Compose([transforms.ToTensor()])
 
     @property
     def dataset(self):
@@ -71,6 +69,51 @@ class Cifar10:
         )
 
         return dataset
+
+
+def preprocess_image_tensor_imagenet(image):
+    preprocess = transforms.Compose([
+    ])
+
+
+class ImageNet:
+    def __init__(self, normalized=True):
+
+        transform_list = [
+            transforms.Resize(299),
+            transforms.CenterCrop(299),
+            transforms.ToTensor()
+        ]
+
+        if normalized:
+            transform_list.append(transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]))
+        self.transform = torchvision.transforms.Compose(transform_list)
+
+    @property
+    def dataset(self):
+        dataset = ImageNetDataset(self.transform)
+        return dataset
+
+
+class ImageNetDataset(Dataset):
+    def __init__(self, transform):
+        self.directory_name = "imagenet"
+
+        os.chdir(f"/{self.directory_name}")
+        self.files = glob.glob("*.jpg")
+
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.files)
+
+    def __getitem__(self, idx):
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+
+        raw_image = Image.open(f"/{self.directory_name}/{self.files[idx]}")
+        image_tensor = self.transform(raw_image)
+        return image_tensor, -1
 
 
 class SmallImagenet:
@@ -91,3 +134,5 @@ class SmallImagenet:
         y = torch.Tensor(y).unsqueeze(1)  # labels are actually not usable
 
         self.dataset = torch.utils.data.TensorDataset(X, y)
+
+
