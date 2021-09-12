@@ -7,7 +7,7 @@ import shap
 import glob, os
 from PIL import Image
 
-from torch_geometric.transforms import ToSLIC
+# from torch_geometric.transforms import ToSLIC
 
 
 def get_dataset(name, normalized=True, SLIC=False):
@@ -97,9 +97,9 @@ class ImageNet:
 
 class ImageNetDataset(Dataset):
     def __init__(self, transform):
-        self.directory_name = "imagenet"
+        self.directory_name = os.path.abspath(__file__ + "/../../imagenet")
 
-        os.chdir(f"/{self.directory_name}")
+        os.chdir(f"{self.directory_name}")
         self.files = glob.glob("*.jpg")
 
         self.transform = transform
@@ -111,7 +111,7 @@ class ImageNetDataset(Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
-        raw_image = Image.open(f"/{self.directory_name}/{self.files[idx]}")
+        raw_image = Image.open(f"{self.directory_name}/{self.files[idx]}")
         image_tensor = self.transform(raw_image)
         return image_tensor, -1
 
