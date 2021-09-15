@@ -11,12 +11,13 @@ def generate_ensembles(attributions, methods, rbm_params, device="cpu"):
     size = [len(methods)] + list(attributions.shape)[1:]
     e = torch.empty(size=size).to(device)
 
+    attributions[torch.isnan(attributions)] = 0
+
     for i, m in enumerate(methods):
 
         if "rbm" in m:
             # TOOO temporary solution
             if m == "flipped_rbm":
-                # TODO flip by 1- or 1/
                 # add flipped rbm
                 j = methods.index("rbm")
                 e[i] = 1 - e[j]

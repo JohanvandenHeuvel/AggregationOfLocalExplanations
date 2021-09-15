@@ -5,8 +5,6 @@ from captum._utils.models.linear_model import SkLearnLinearRegression, SkLearnLa
 from captum.attr._core.lime import get_exp_kernel_similarity_function
 from kornia.filters import gaussian_blur2d
 from skimage.segmentation import slic
-
-
 from skimage.segmentation import mark_boundaries
 import matplotlib.pyplot as plt
 
@@ -166,7 +164,7 @@ def gray_image(**kwargs):
 
 def noise_normal(**kwargs):
     def f(x, y):
-        return torch.randn(x.shape).to(x.device)
+        return torch.normal(mean=0, std=1, size=x.shape).to(x.device)
 
     return f
 

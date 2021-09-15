@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from models.model import get_model
-from scripts.attribution_methods import attribution_method, generate_attributions
+from scripts.attribution_methods import generate_attributions
 from captum.attr import visualization as viz
 from scripts.normalize import normalize
 import scripts.datasets as datasets
@@ -28,16 +28,20 @@ torch.cuda.empty_cache()
 #  experiment conditions  #
 ###########################
 params = {
-    "model": "Resnet18_cifar10",
-    "dataset": "cifar10",
-    "batch_size": 40,
+    "model": "Resnet18",
+    "dataset": "imagenet",
+    "batch_size": 1,
     "max_nr_batches": 50,  # -1 for no early stopping
     "attribution_methods": [
-        "lime_1",
         "lime_2",
-        "lime_3",
+        "guidedbackprop",
+        "integrated_gradients",
+        #"deeplift",
+        "gradientshap",
+        "smoothgrad",
+        #"saliency"
     ]
-    + ["noise_uniform"] * 0,
+    + ["noise_normal"] * 15,
     "ensemble_methods": [
         "mean",
         "variance",
@@ -45,13 +49,14 @@ params = {
         "flipped_rbm",
         "rbm_flip_detection",
     ],
-    "attribution_processing": "filtering",
+    "attribution_processing": "splitting",
     "normalization": "min_max",
     "scoring_methods": ["insert", "delete", "irof"],
-    "scores_batch_size": 100,
+    "scores_batch_size": 40,
     "package_size": 1,
     "irof_segments": 60,
     "irof_sigma": 4,
+    "batches_to_plot": []
 }
 
 attribution_params = {
@@ -59,6 +64,7 @@ attribution_params = {
     "lime_2": {"use_slic": True, "n_slic_segments": 100,},
     "lime_3": {"use_slic": True, "n_slic_segments": 1000,},
     "integrated_gradients": {"baseline": "black",},
+    "noise_normal": {},
     "deeplift": {},
     "gradientshap": {},
     "saliency": {},
@@ -69,9 +75,9 @@ attribution_params = {
 }
 
 rbm_params = {
-    "batch_size": 28,
+    "batch_size": 15,
     "learning_rate": 0.001,
-    "n_iter": 100,
+    "n_iter": 300,
 }
 
 
@@ -85,7 +91,12 @@ def main():
     # dataset and which images to explain the classification for
     dataset = datasets.get_dataset(params["dataset"])
     dataloader = torch.utils.data.DataLoader(
-        dataset, batch_size=params["batch_size"], shuffle=True, num_workers=2
+        dataset, batch_size=params["batch_size"], shuffle=False, num_workers=2
+    )
+
+    dataset_raw = datasets.get_dataset(params["dataset"], normalized=False)
+    dataloader_raw = torch.utils.data.DataLoader(
+        dataset_raw, batch_size=params["batch_size"], shuffle=False, num_workers=2
     )
 
     # Preparation for score computation later
@@ -101,8 +112,7 @@ def main():
     # TODO: Remove later
     # for i in tqdm(range(len(dataloader))):
     #     (image_batch, label_batch) = next(iter)
-    for i, (image_batch, label_batch) in tqdm(enumerate(dataloader)):
-
+    for i, ((image_batch, label_batch), (raw_batch, _)) in tqdm(enumerate(zip(dataloader, dataloader_raw))):
         # put data on gpu if possible
         image_batch = image_batch.to(device)
         label_batch = label_batch.to(device)
@@ -115,6 +125,8 @@ def main():
 
         # only use images that the network predicts correctly
         mask = torch.eq(label_batch, predicted_labels)
+        if len(mask.shape) == 0:
+            continue
         indices = torch.masked_select(torch.arange(0, len(mask)).to(device), mask)
 
         # generate explanations
@@ -160,8 +172,8 @@ def main():
             #        ensembles        #
             ###########################
 
-            pos_ens = generate_ensembles(pos_norm, params["ensemble_methods"], device)
-            neg_ens = generate_ensembles(neg_norm, params["ensemble_methods"], device)
+            pos_ens = generate_ensembles(pos_norm, params["ensemble_methods"], rbm_params, device)
+            neg_ens = generate_ensembles(neg_norm, params["ensemble_methods"], rbm_params, device)
 
             # Combine negative and positive attributions again
             ensemble_attributions = pos_ens - neg_ens
@@ -198,49 +210,67 @@ def main():
             ensemble_attributions,
         )
 
-        # # TODO: Uncommented, maybe put into a separate function
         # ###########################
         # #      plot examples      #
         # ###########################
-        # for idx in range(len(indices)):
-        #     # idx = 0  # first image of the batch
-        #     original_img = (
-        #         torch.mean(image_batch[indices], dim=1)[idx].cpu().detach().numpy()
-        #     )
-        #     images = [original_img]
-        #
-        #     # TODO don't plot noise attributions
-        #     # one image for every attribution method
-        #     for j in range(len(attributions)):
-        #         attribution_img = attributions[j][idx].cpu().detach().numpy()
-        #         images.append(attribution_img)
-        #
-        #     # one image for every ensemble method
-        #     for j in range(len(params["ensemble_methods"])):
-        #         ensemble_img = ensemble_attributions[j][idx].cpu().detach().numpy()
-        #         images.append(ensemble_img)
-        #
-        #     my_plot(
-        #         images,
-        #         ["original"]
-        #         + params["attribution_methods"]
-        #         + params["ensemble_methods"]
-        #         + ["flipped_rbm"],
-        #         save=False,
-        #     )
+        if i in params["batches_to_plot"]:
+            plot(
+                image_batch[indices],
+                raw_batch[indices],
+                attributions[:, indices],
+                ensemble_attributions[:, indices],
+                plot_text=f"{i}"
+            )
 
-        print(i, params['max_nr_batches'])
-
-        if i+1 >= params["max_nr_batches"] > 0:
-            print("stopped early")
+        if params["max_nr_batches"] != -1 and i >= params["max_nr_batches"]-1:
             break
+
 
     write_scores_to_file(scores)
     score_table = create_score_table(scores)
-    pd.options.display.width = 0
-    print(score_table)
+
     score_table_path = os.path.join(folder_path, "score_table.csv")
     score_table.to_csv(score_table_path)
+
+    pd.options.display.width = 0
+    print(score_table)
+
+
+def plot(images, raw_images, attributions, ensemble_attributions, plot_text=""):
+    for idx in range(len(images)):
+        # idx = 0  # first image of the batch
+        orig_image = raw_images[idx].detach().cpu().numpy()
+        orig_image = orig_image.transpose(1, 2, 0)
+        # For MNIST remove the color dimension
+        if orig_image.shape[2] == 1:
+            orig_image = orig_image.reshape(orig_image.shape[0:2])
+        images = [orig_image]
+
+        # one image for every attribution method
+        for j, title in enumerate(params["attribution_methods"]):
+            # Remove randoms step 1
+            if "noise" in title:
+                continue
+            attribution_img = attributions[j][idx].cpu().detach().numpy()
+            images.append(attribution_img)
+            #     # one image for every ensemble method
+        for j in range(len(params["ensemble_methods"])):
+            ensemble_img = ensemble_attributions[j][idx].cpu().detach().numpy()
+            images.append(ensemble_img)
+
+        # Remove the randoms step 2
+        non_random = np.array(["noise" not in t for t in params["attribution_methods"]])
+        attr_methods = np.array(params["attribution_methods"])[non_random]
+
+        my_plot(
+            images,
+            ["original"]
+            + list(attr_methods)
+            + params["ensemble_methods"]
+            + ["flipped_rbm"],
+            save=True,
+            main_title=f"{plot_text}_{idx}"
+        )
 
 
 def create_score_table(scores):
@@ -273,32 +303,40 @@ def create_score_table(scores):
     return df
 
 
-def my_plot(images, titles, save=False):
+def my_plot(images, titles, save=False, main_title=""):
     # make a square
     x = int(np.ceil(np.sqrt(len(images))))
-    fig, axs = plt.subplots(x, x, figsize=(10, 10))
+    fig, axs = plt.subplots(x, x, figsize=(30, 40))
+    fig.suptitle(main_title)
+
+    # Remove the NaNs
+    for i in range(len(images)):
+        images[i][np.isnan(images[i])] = 0
+
+    # Ensure that all attributions get equal weight during plotting
+    mean_max_value = np.mean([np.max(img / np.sum(img)) for img in images[1:]])
 
     # plot the images
     for i, ax in enumerate(axs.flatten()):
         if i < len(images):
-            viz.visualize_image_attr(
-                images[i][..., np.newaxis],
-                # attr_map.permute(1, 2, 0).numpy(),  # adjust shape to height, width, channels
-                method="heat_map",
-                sign="all",
-                show_colorbar=True,
-                title=titles[i],
-                plt_fig_axis=(fig, ax),
-                use_pyplot=False,
-            )
+            if i == 0:
+                # Show the original image
+                ax.imshow(images[i])
+            else:
+                # Plot the attributions and ensure equal plotting
+                img = images[i] / np.sum(images[i]) / mean_max_value
+                ax.imshow(img, vmin=0, vmax=1/3, cmap="Greens")
+            ax.set_axis_off()
+            ax.set_title(titles[i])
         else:
             ax.set_visible(False)
 
     plt.tight_layout()
 
     if save:
-        file_name = now.strftime("%m-%d_@%H-%M-%S.png")
-        file_path = os.path.join(folder_path, file_name)
+        f = os.path.abspath(__file__ + "/..")
+        file_name = main_title + ".png"
+        file_path = f + "/" + folder_path + "/" + file_name
         fig.savefig(file_path, dpi=fig.dpi)
     else:
         plt.show()
@@ -345,7 +383,7 @@ if __name__ == "__main__":
 
     now = datetime.datetime.now()
     folder_name = now.strftime("%m-%d_@%H-%M-%S")
-    folder_path = os.path.join(results_dir, folder_name)
+    folder_path = results_dir + "/" + folder_name
     os.makedirs(folder_path)
 
     write_params_to_disk(params, "params")

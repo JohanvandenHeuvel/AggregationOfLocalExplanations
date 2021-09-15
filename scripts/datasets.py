@@ -80,8 +80,8 @@ class ImageNet:
     def __init__(self, normalized=True):
 
         transform_list = [
-            transforms.Resize(299),
-            transforms.CenterCrop(299),
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
             transforms.ToTensor()
         ]
 
