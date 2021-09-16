@@ -1,0 +1,59 @@
+{
+    "model": "mnist_model",
+    "dataset": "mnist",
+    "batch_size": 5,
+    "max_nr_batches": 100,
+    "attribution_methods": [
+        "lime_2",
+        "guidedbackprop",
+        "integrated_gradients",
+        "gradientshap",
+        "smoothgrad",
+        "noise_normal",
+        "noise_normal",
+        "noise_normal",
+        "noise_normal",
+        "noise_normal",
+        "noise_normal",
+        "noise_normal",
+        "noise_normal",
+        "noise_normal",
+        "noise_normal",
+        "noise_normal",
+        "noise_normal",
+        "noise_normal",
+        "noise_normal",
+        "noise_normal"
+    ],
+    "ensemble_methods": [
+        "mean",
+        "variance",
+        "rbm",
+        "flipped_rbm",
+        "rbm_flip_detection"
+    ],
+    "attribution_processing": "filtering",
+    "normalization": "min_max",
+    "scoring_methods": [
+        "insert",
+        "delete",
+        "irof"
+    ],
+    "scores_batch_size": 4,
+    "package_size": 2,
+    "irof_segments": 60,
+    "irof_sigma": 4,
+    "batches_to_plot": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+    ]
+}
