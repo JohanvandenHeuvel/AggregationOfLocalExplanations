@@ -60,17 +60,9 @@ params = {
 }
 
 attribution_params = {
-    "lime_1": {
-        "use_slic": True,
-        "n_slic_segments": 10,
-    },
-    "lime_2": {
+    "lime": {
         "use_slic": True,
         "n_slic_segments": 100,
-    },
-    "lime_3": {
-        "use_slic": True,
-        "n_slic_segments": 1000,
     },
     "integrated_gradients": {
         "baseline": "black",

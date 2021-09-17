@@ -1,0 +1,17 @@
+{
+    "lime": {
+        "use_slic": true,
+        "n_slic_segments": 100
+    },
+    "integrated_gradients": {
+        "baseline": "black"
+    },
+    "noise_normal": {},
+    "deeplift": {},
+    "gradientshap": {},
+    "saliency": {},
+    "occlusion": {},
+    "smoothgrad": {},
+    "guidedbackprop": {},
+    "gray_image": {}
+}
