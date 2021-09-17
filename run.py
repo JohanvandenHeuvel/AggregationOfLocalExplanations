@@ -28,20 +28,20 @@ torch.cuda.empty_cache()
 #  experiment conditions  #
 ###########################
 params = {
-    "model": "Resnet18",
-    "dataset": "imagenet",
-    "batch_size": 1,
+    "model": "Resnet18_cifar10",
+    "dataset": "cifar10",
+    "batch_size": 20,
     "max_nr_batches": 50,  # -1 for no early stopping
     "attribution_methods": [
-        "lime_2",
-        "guidedbackprop",
-        "integrated_gradients",
-        #"deeplift",
         "gradientshap",
+        "deeplift",
+        "lime",
+        "saliency",
         "smoothgrad",
-        #"saliency"
-    ]
-    + ["noise_normal"] * 15,
+        "integrated_gradients",
+        "guidedbackprop",
+        "gray_image",
+    ],
     "ensemble_methods": [
         "mean",
         "variance",
@@ -49,21 +49,32 @@ params = {
         "flipped_rbm",
         "rbm_flip_detection",
     ],
-    "attribution_processing": "splitting",
+    "attribution_processing": "filtering",
     "normalization": "min_max",
     "scoring_methods": ["insert", "delete", "irof"],
     "scores_batch_size": 40,
     "package_size": 1,
     "irof_segments": 60,
     "irof_sigma": 4,
-    "batches_to_plot": []
+    "batches_to_plot": [],
 }
 
 attribution_params = {
-    "lime_1": {"use_slic": True, "n_slic_segments": 10,},
-    "lime_2": {"use_slic": True, "n_slic_segments": 100,},
-    "lime_3": {"use_slic": True, "n_slic_segments": 1000,},
-    "integrated_gradients": {"baseline": "black",},
+    "lime_1": {
+        "use_slic": True,
+        "n_slic_segments": 10,
+    },
+    "lime_2": {
+        "use_slic": True,
+        "n_slic_segments": 100,
+    },
+    "lime_3": {
+        "use_slic": True,
+        "n_slic_segments": 1000,
+    },
+    "integrated_gradients": {
+        "baseline": "black",
+    },
     "noise_normal": {},
     "deeplift": {},
     "gradientshap": {},
@@ -112,13 +123,15 @@ def main():
     # TODO: Remove later
     # for i in tqdm(range(len(dataloader))):
     #     (image_batch, label_batch) = next(iter)
-    for i, ((image_batch, label_batch), (raw_batch, _)) in tqdm(enumerate(zip(dataloader, dataloader_raw))):
+    for i, ((image_batch, label_batch), (raw_batch, _)) in tqdm(
+        enumerate(zip(dataloader, dataloader_raw))
+    ):
         # put data on gpu if possible
         image_batch = image_batch.to(device)
         label_batch = label_batch.to(device)
 
         # we use the predicted labels as targets
-        label_batch = predict_label(model, image_batch).squeeze()
+        # label_batch = predict_label(model, image_batch).squeeze()
 
         # for what label the image should be explained for
         predicted_labels = predict_label(model, image_batch).squeeze()
@@ -172,15 +185,19 @@ def main():
             #        ensembles        #
             ###########################
 
-            pos_ens = generate_ensembles(pos_norm, params["ensemble_methods"], rbm_params, device)
-            neg_ens = generate_ensembles(neg_norm, params["ensemble_methods"], rbm_params, device)
+            pos_ens = generate_ensembles(
+                pos_norm, params["ensemble_methods"], rbm_params, device
+            )
+            neg_ens = generate_ensembles(
+                neg_norm, params["ensemble_methods"], rbm_params, device
+            )
 
             # Combine negative and positive attributions again
             ensemble_attributions = pos_ens - neg_ens
 
             # Finally also normalize individual attributions
             attributions = normalize(params["normalization"], arr=attributions)
-        elif params['attribution_processing'] == 'none':
+        elif params["attribution_processing"] == "none":
             # Make sure we have values in range [0,1]
             attributions = normalize(params["normalization"], arr=attributions)
 
@@ -219,12 +236,11 @@ def main():
                 raw_batch[indices],
                 attributions[:, indices],
                 ensemble_attributions[:, indices],
-                plot_text=f"{i}"
+                plot_text=f"{i}",
             )
 
-        if params["max_nr_batches"] != -1 and i >= params["max_nr_batches"]-1:
+        if params["max_nr_batches"] != -1 and i >= params["max_nr_batches"] - 1:
             break
-
 
     write_scores_to_file(scores)
     score_table = create_score_table(scores)
@@ -269,7 +285,7 @@ def plot(images, raw_images, attributions, ensemble_attributions, plot_text=""):
             + params["ensemble_methods"]
             + ["flipped_rbm"],
             save=True,
-            main_title=f"{plot_text}_{idx}"
+            main_title=f"{plot_text}_{idx}",
         )
 
 
@@ -325,7 +341,7 @@ def my_plot(images, titles, save=False, main_title=""):
             else:
                 # Plot the attributions and ensure equal plotting
                 img = images[i] / np.sum(images[i]) / mean_max_value
-                ax.imshow(img, vmin=0, vmax=1/3, cmap="Greens")
+                ax.imshow(img, vmin=0, vmax=1 / 3, cmap="Greens")
             ax.set_axis_off()
             ax.set_title(titles[i])
         else:
