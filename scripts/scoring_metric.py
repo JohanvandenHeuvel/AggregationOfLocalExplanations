@@ -71,6 +71,7 @@ class ScoringMetric:
 
         if scoring_method == "irof":
             y = 1-y
+            y = np.clip(y, 0, 1)
 
         score = auc(x, y) / len(rel_probs)
 
