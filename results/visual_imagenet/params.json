@@ -2,7 +2,7 @@
     "model": "Resnet18",
     "dataset": "imagenet",
     "batch_size": 1,
-    "max_nr_batches": 100,
+    "max_nr_batches": 70,
     "attribution_methods": [
         "lime_2",
         "guidedbackprop",
@@ -27,19 +27,12 @@
     "scores_batch_size": 4,
     "package_size": 2,
     "irof_segments": 60,
-    "irof_sigma": 4,
+    "irof_sigma": 1,
     "batches_to_plot": [
-        5,
-        10,
         14,
         16,
-        18,
         19,
-        27,
-        37,
-        38,
-        44,
-        43,
-        41
+        41,
+        57
     ]
 }
