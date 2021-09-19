@@ -18,6 +18,7 @@ for i, score in enumerate(["insert", "delete", "irof"]):
     mean = np.array(df["mean"])
     rmb_flip_detection = np.array(df["rbm_flip_detection"])
 
+
     sns.distplot(rmb_flip_detection - IG_1, kde=False, ax=ax[0])
     sns.distplot(rmb_flip_detection - IG_2, kde=False, ax=ax[1])
     sns.distplot(rmb_flip_detection - IG_3, kde=False, ax=ax[2])

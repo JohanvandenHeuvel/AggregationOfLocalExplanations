@@ -1,6 +1,32 @@
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+
+plt.style.use('seaborn-paper')
+
+# mpl.use('pdf')
+
+#plt.rc('font', family='Avenir', serif='Computer Modern')
+plt.rc('text', usetex=True)
+plt.rc('xtick', labelsize=16)
+plt.rc('ytick', labelsize=16)
+plt.rc('axes', labelsize=19)
+plt.rc('axes', titlesize=19)
+plt.rc('legend',fontsize=15) # using a size in points
+plt.rcParams['axes.linewidth'] = 2.3
+plt.rcParams["figure.figsize"] = (6.,4.1631189606246317)
+
+rc = {"axes.spines.left" : True,
+      "axes.spines.right" : True,
+      "axes.spines.bottom" : True,
+      "axes.spines.top" : True,
+      "xtick.bottom" : True,
+      "xtick.labelbottom" : True,
+      "ytick.labelleft" : True,
+      "ytick.left" : True}
+plt.rcParams.update(rc)
 
 data = np.load("scores.npy", allow_pickle=True).item()
 
@@ -17,16 +43,29 @@ for i, score in enumerate(["insert", "delete", "irof"]):
     mean = np.array(df["mean"])
     rmb_flip_detection = np.array(df["rbm_flip_detection"])
 
-    sns.distplot(rmb_flip_detection - lime_1, kde=False, ax=ax[0])
-    sns.distplot(rmb_flip_detection - lime_2, kde=False, ax=ax[1])
-    sns.distplot(rmb_flip_detection - lime_3, kde=False, ax=ax[2])
+    for j, lime in enumerate([lime_1, lime_2, lime_3]):
+        if score == "delete":
+            b = lime - rmb_flip_detection
+        else:
+            b = rmb_flip_detection - lime
+        b += 1
+        threshold = 1
 
-    ax[0].set_title("rbm vs lime1 ({})".format(score))
-    ax[1].set_title("rbm vs lime2 ({})".format(score))
-    ax[2].set_title("rbm vs lime3 ({})".format(score))
+        percentage = sum(b >= threshold) / len(b) * 100
+        pos = b[b >= threshold]
+        neg = b[b < threshold]
+        sns.distplot(pos, kde=False, ax=ax[j], color='green')
+        sns.distplot(neg, kde=False, ax=ax[j], color='red')
+        ax[j].legend(["{:.1f}\%".format(percentage), "{:.1f}\%".format(100-percentage)])
+
+    if score == "irof":
+        score = score.upper()
+    ax[0].set_title("RBM vs. LIME-1 ({})".format(score))
+    ax[1].set_title("RBM vs. LIME-2 ({})".format(score))
+    ax[2].set_title("RBM vs. LIME-3 ({})".format(score))
 
 plt.tight_layout()
-plt.show()
+# plt.show()
 
     # if score == "delete":
     #     lime = np.min([lime_1, lime_2, lime_3])
@@ -51,5 +90,4 @@ plt.show()
     # print("mean:  \t", sum(x_mean) / len(x_mean) * 100, "%")
 
 
-
-print("test")
+plt.savefig('multiple_lime.png', dpi=300,  bbox_inches="tight")
