@@ -224,7 +224,6 @@ def main():
         # ###########################
         if i in params["batches_to_plot"]:
             plot(
-                image_batch[indices],
                 raw_batch[indices],
                 attributions[:, indices],
                 ensemble_attributions[:, indices],
@@ -244,8 +243,8 @@ def main():
     print(score_table)
 
 
-def plot(images, raw_images, attributions, ensemble_attributions, plot_text=""):
-    for idx in range(len(images)):
+def plot(raw_images, attributions, ensemble_attributions, plot_text=""):
+    for idx in range(attributions.shape[1]):
         # idx = 0  # first image of the batch
         orig_image = raw_images[idx].detach().cpu().numpy()
         orig_image = orig_image.transpose(1, 2, 0)
@@ -276,7 +275,7 @@ def plot(images, raw_images, attributions, ensemble_attributions, plot_text=""):
             + list(attr_methods)
             + params["ensemble_methods"]
             + ["flipped_rbm"],
-            save=True,
+            save=False,
             main_title=f"{plot_text}_{idx}",
         )
 
