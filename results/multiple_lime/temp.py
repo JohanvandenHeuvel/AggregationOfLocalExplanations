@@ -31,18 +31,36 @@ plt.rcParams.update(rc)
 data = np.load("scores.npy", allow_pickle=True).item()
 
 # print('Percentage of images where the RBM scores better:')
-fig, axs = plt.subplots(3, 3, figsize=(10, 10))
-for i, score in enumerate(["insert", "delete", "irof"]):
+fig, axs = plt.subplots(1, 3, figsize=(15, 5))
 
+# fig = plt.figure(figsize=(10, 10))
+#
+# ax1 = plt.subplot(331)  # (0, 0)
+# ax2 = plt.subplot(332)  # (0, 1)
+# ax3 = plt.subplot(333)  # (0, 2)
+#
+# ax4 = plt.subplot(334)  # (1, 0)
+# ax5 = plt.subplot(335)  # (1, 1)
+# ax6 = plt.subplot(336)  # (1, 2)
+#
+# ax7 = plt.subplot(337)  # (2, 0)
+# ax8 = plt.subplot(338)  # (2, 1)
+# ax9 = plt.subplot(339)  # (2, 2)
+
+for i, score in enumerate(["delete"]):
+
+    # ax = axs[i]
+    ax = axs
+
+    # get the data
     df = data[score]
-    ax = axs[i]
-
     lime_1 = np.array(df["lime_1"])
     lime_2 = np.array(df["lime_2"])
     lime_3 = np.array(df["lime_3"])
     mean = np.array(df["mean"])
     rmb_flip_detection = np.array(df["rbm_flip_detection"])
 
+    # plot the distribution
     for j, lime in enumerate([lime_1, lime_2, lime_3]):
         if score == "delete":
             b = lime - rmb_flip_detection
@@ -56,13 +74,24 @@ for i, score in enumerate(["insert", "delete", "irof"]):
         neg = b[b < threshold]
         sns.distplot(pos, kde=False, ax=ax[j], color='green')
         sns.distplot(neg, kde=False, ax=ax[j], color='red')
+
+        if i % 3 == 0:
+            t = "LIME-" + str(j)
+            ax[j].set_title(t)
+        if j % 3 == 0:
+            if score == "irof":
+                score = score.upper()
+            ax[j].set(ylabel=score)
+        # remove y-ticks
+        ax[j].set(yticklabels=[])
         ax[j].legend(["{:.1f}\%".format(percentage), "{:.1f}\%".format(100-percentage)])
 
-    if score == "irof":
-        score = score.upper()
-    ax[0].set_title("RBM vs. LIME-1 ({})".format(score))
-    ax[1].set_title("RBM vs. LIME-2 ({})".format(score))
-    ax[2].set_title("RBM vs. LIME-3 ({})".format(score))
+    # # add the title
+    # if score == "irof":
+    #     score = score.upper()
+    # ax[0].set_title("RBM vs. LIME-1 ({})".format(score))
+    # ax[1].set_title("RBM vs. LIME-2 ({})".format(score))
+    # ax[2].set_title("RBM vs. LIME-3 ({})".format(score))
 
 plt.tight_layout()
 # plt.show()
@@ -90,4 +119,4 @@ plt.tight_layout()
     # print("mean:  \t", sum(x_mean) / len(x_mean) * 100, "%")
 
 
-plt.savefig('multiple_lime.png', dpi=300,  bbox_inches="tight")
+plt.savefig('multiple_lime.pdf', bbox_inches="tight")
