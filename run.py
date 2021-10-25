@@ -6,6 +6,7 @@ import datetime
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+from explainable_ai_image_measures import Measures
 
 from models.model import get_model
 from scripts.attribution_methods import generate_attributions
@@ -15,6 +16,7 @@ import scripts.datasets as datasets
 from scripts.ensemble import generate_ensembles
 from models.predict import predict_label
 from scripts.scoring_metric import ScoringMetric
+from scripts.scoring_metric import compute_batch_score
 
 import warnings
 
@@ -30,8 +32,8 @@ torch.cuda.empty_cache()
 params = {
     "model": "Resnet18_cifar10",
     "dataset": "cifar10",
-    "batch_size": 20,
-    "max_nr_batches": 50,  # -1 for no early stopping
+    "batch_size": 2,
+    "max_nr_batches": 2,  # -1 for no early stopping
     "attribution_methods": [
         "gradientshap",
         "deeplift",
@@ -41,6 +43,8 @@ params = {
         "integrated_gradients",
         "guidedbackprop",
         "gray_image",
+        "noise_normal",
+        "noise_uniform"
     ],
     "ensemble_methods": [
         "mean",
@@ -51,8 +55,8 @@ params = {
     ],
     "attribution_processing": "filtering",
     "normalization": "min_max",
-    "scoring_methods": ["insert", "delete", "irof"],
-    "scores_batch_size": 40,
+    "scoring_methods": ["IAUC", "DAUC", "IROF"],
+    "scores_batch_size": 400,
     "package_size": 1,
     "irof_segments": 60,
     "irof_sigma": 4,
@@ -67,6 +71,7 @@ attribution_params = {
     "integrated_gradients": {
         "baseline": "black",
     },
+    "noise_uniform": {},
     "noise_normal": {},
     "deeplift": {},
     "gradientshap": {},
@@ -74,7 +79,7 @@ attribution_params = {
     "occlusion": {},
     "smoothgrad": {},
     "guidedbackprop": {},
-    "gray_image": {},
+    "gray_image": {}
 }
 
 rbm_params = {
@@ -110,12 +115,18 @@ def main():
             for score in params["scoring_methods"]
         ]
     )
-    metric = ScoringMetric(model, scores, params)
+    measure = Measures(model,
+                       params["scores_batch_size"],
+                       params["irof_segments"],
+                       params["irof_sigma"],
+                       params["package_size"],
+                       normalize=False,
+                       clip01=False)
     # iter = dataloader.__iter__()
     # TODO: Remove later
-    # for i in tqdm(range(len(dataloader))):
-    #     (image_batch, label_batch) = next(iter)
-    for i, ((image_batch, label_batch), (raw_batch, _)) in tqdm(
+    #for i in tqdm(range(len(dataloader))):
+    #    (image_batch, label_batch) = next(dataloader.__iter__())
+     for i, ((image_batch, label_batch), (raw_batch, _)) in tqdm(
         enumerate(zip(dataloader, dataloader_raw))
     ):
         # put data on gpu if possible
@@ -211,13 +222,13 @@ def main():
         ###########################
         #       statistics        #
         ###########################
-
-        metric.compute_batch_score(
-            image_batch[indices],
-            label_batch[indices],
-            attributions,
-            ensemble_attributions,
-        )
+        compute_batch_score(scores,
+                            measure,
+                            image_batch[indices],
+                            label_batch[indices],
+                            attributions,
+                            ensemble_attributions,
+                            params)
 
         # ###########################
         # #      plot examples      #
